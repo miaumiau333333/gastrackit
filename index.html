@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ef9f27">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lisnave Gas">
+<meta name="application-name" content="Lisnave Gas">
+<meta name="msapplication-TileColor" content="#1a3f7a">
+<meta name="msapplication-TileImage" content="icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="shortcut icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json?v=2">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<title>Lisnave — Rastreamento de Garrafas de Gás</title>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+:root {
+  --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Consolas', 'Courier New', monospace;
+  --border-radius-md: 8px;
+  --color-bg: #f5f7fa;
+  --color-bg2: #ffffff;
+  --color-bg3: #e9ecf1;
+  --color-text: #1a1a1a;
+  --color-text2: #666666;
+  --color-border: #e0e5eb;
+  --color-accent: #ef9f27;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.16);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--color-bg);font-family:var(--font-sans)}
+body{display:flex;flex-direction:column;padding:0}
+#app{height:100vh;display:flex;flex-direction:column;width:100%}
+
+/* TOOLBAR */
+#tb{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--color-border);background:var(--color-bg2);flex-shrink:0;position:relative;z-index:3000;box-shadow:var(--shadow-sm)}
+#bnd{display:flex;align-items:center;gap:12px}
+#bico{width:44px;height:44px;flex-shrink:0}
+#bnm{font-size:14px;font-weight:700;letter-spacing:2px;color:var(--color-text)}
+#bsub{font-size:11px;color:var(--color-text2);margin-top:2px;font-weight:500}
+#sbar{display:flex;gap:12px;margin-left:auto}
+.sc{background:var(--color-bg3);border:none;border-radius:var(--border-radius-md);padding:8px 14px;text-align:center;min-width:70px;cursor:pointer;transition:all .3s}
+.sc:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.sc.active{background:linear-gradient(135deg,#e24b4a,#ff6b6b);color:white}
+.sc.active.s2{background:linear-gradient(135deg,var(--color-accent),#ffb74d)}
+.sc.active.s3{background:linear-gradient(135deg,#639922,#81c784)}
+.sv{font-size:18px;font-weight:700;color:var(--color-text);font-family:var(--font-mono)}
+.sc.active .sv,.sc.active .sl{color:white}
+.sl{font-size:9px;color:var(--color-text2);text-transform:uppercase;margin-top:4px;font-weight:600}
+.sc.s1 .sv{color:#e24b4a}.sc.s2 .sv{color:var(--color-accent)}.sc.s3 .sv{color:#639922}
+#rtb{font-size:10px;color:#2ecc71;letter-spacing:1px;display:flex;align-items:center;gap:6px;font-weight:600;padding:6px 12px;background:rgba(46,204,113,.1);border-radius:var(--border-radius-md)}
+#rdot{width:6px;height:6px;border-radius:50%;background:#2ecc71;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#cfg-btn{font-size:12px;padding:8px 14px;border-radius:var(--border-radius-md);border:none;background:var(--color-bg3);color:var(--color-text);cursor:pointer;font-weight:600;transition:all .3s}
+#cfg-btn:hover{background:var(--color-accent);color:white}
+.logo-tb{height:38px;width:auto}
+
+/* SIDEBAR */
+#bdy{display:flex;flex:1;min-height:0}
+#sb{width:300px;flex-shrink:0;border-right:1px solid var(--color-border);display:flex;flex-direction:column;overflow-y:auto;background:var(--color-bg2);position:relative;z-index:2500;box-shadow:var(--shadow-sm)}
+#ssr{padding:12px;border-bottom:1px solid #f0f2f5;flex-shrink:0}
+#ssr input{width:100%;font-size:13px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--border-radius-md);background:var(--color-bg3);color:var(--color-text);outline:none}
+#ssr input:focus{border-color:var(--color-accent);box-shadow:0 0 0 3px rgba(239,159,39,.1)}
+#sfil{display:flex;gap:6px;padding:10px;border-bottom:1px solid #f0f2f5;flex-wrap:wrap;flex-shrink:0}
+.fch{font-size:11px;padding:6px 12px;border-radius:20px;border:1px solid var(--color-border);background:transparent;cursor:pointer;color:var(--color-text2);font-weight:600;transition:all .3s}
+.fch:hover{background:var(--color-bg3)}
+.fch.on{background:var(--color-accent);color:white;border-color:var(--color-accent)}
+#szn{padding:10px;border-bottom:1px solid #f0f2f5;flex-shrink:0}
+#szn select{width:100%;font-size:12px;padding:8px 10px;border:1px solid var(--color-border);border-radius:var(--border-radius-md);background:var(--color-bg3);color:var(--color-text);outline:none;cursor:pointer}
+#clist{flex:1;overflow-y:auto;padding:8px}
+.ci{padding:10px;border-radius:var(--border-radius-md);cursor:pointer;border:1px solid transparent;margin-bottom:6px;display:flex;align-items:center;gap:10px;transition:all .3s}
+.ci:hover{background:var(--color-bg3);transform:translateX(4px)}
+.ci.sel{background:linear-gradient(135deg,var(--color-accent),rgba(239,159,39,.8));border-color:var(--color-accent);box-shadow:var(--shadow-md)}
+.ci.sel .cid,.ci.sel .csub{color:white}
+.cd{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cinf{flex:1;min-width:0}
+.cid{font-size:12px;font-weight:700;font-family:var(--font-mono);color:var(--color-text)}
+.csub{font-size:11px;color:var(--color-text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.cst{font-size:10px;padding:4px 8px;border-radius:12px;flex-shrink:0;font-weight:600}
+.cst.ativa{background:rgba(226,75,74,.15);color:#e24b4a}
+.cst.recolha{background:rgba(239,159,39,.15);color:var(--color-accent)}
+.cst.recuperada{background:rgba(99,153,34,.15);color:#639922}
+
+/* MAP */
+#mapcol{flex:1;display:flex;flex-direction:column;position:relative}
+#map{
+  width:100%;
+  height:100%;
+  position:relative;
+}
+#map-toolbar{position:absolute;top:15px;right:15px;display:flex;gap:8px;z-index:1800}
+.map-btn{background:white;border:none;border-radius:4px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,.15);transition:all .3s}
+.map-btn:hover{box-shadow:0 4px 8px rgba(0,0,0,.2)}
+.map-btn.active{background:var(--color-accent);color:white}
+.mobile-only{display:none}
+.leaflet-container{background:#0d1720}
+
+/* DETAIL PANEL */
+#dp{position:absolute;bottom:20px;left:20px;background:var(--color-bg2);border:1px solid var(--color-border);border-radius:var(--border-radius-md);padding:16px;display:none;max-width:340px;box-shadow:var(--shadow-lg);z-index:1700}
+#dp.vis{display:block}
+#dph{display:flex;align-items:center;margin-bottom:12px;gap:8px}
+#dpid{font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--color-accent)}
+#dptype{font-size:12px;color:var(--color-text2);font-weight:600}
+#dpclose{margin-left:auto;cursor:pointer;font-size:20px;color:var(--color-text2);padding:4px 8px;border-radius:6px}
+#dpclose:hover{background:var(--color-bg3)}
+#dpmeta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.dm{background:var(--color-bg3);border-radius:var(--border-radius-md);padding:8px 10px}
+.dml{font-size:9px;color:var(--color-text2);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+.dmv{font-size:13px;font-weight:600;color:var(--color-text);margin-top:4px}
+#dpact{display:flex;gap:6px;flex-wrap:wrap}
+.dab{font-size:11px;padding:6px 10px;border-radius:var(--border-radius-md);border:1px solid var(--color-border);cursor:pointer;background:transparent;color:var(--color-text);font-weight:600;flex:1;text-align:center}
+.dab:hover{background:var(--color-bg3)}
+.dab.w{border-color:var(--color-accent);color:var(--color-accent)}
+.dab.s{border-color:#639922;color:#639922}
+.dab.r{border-color:#1565c0;color:#1565c0}
+.dab.danger{border-color:#e24b4a;color:#e24b4a}
+.dab.edit-btn{border-color:#7c3aed;color:#7c3aed}
+
+/* TOAST */
+#toast{position:absolute;bottom:20px;right:20px;background:var(--color-bg2);border:1px solid var(--color-border);border-radius:var(--border-radius-md);padding:12px 16px;font-size:12px;color:var(--color-text);opacity:0;transition:opacity .3s;pointer-events:none;z-index:1900;max-width:280px;box-shadow:var(--shadow-md);font-weight:600}
+#toast.show{opacity:1}
+
+/* OVERLAY SHARED */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.overlay.open{display:flex}
+.modal-box{background:var(--color-bg2);border:none;border-radius:var(--border-radius-md);max-width:95vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-lg)}
+.modal-hdr{padding:20px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:12px;color:white}
+.modal-hdr.orange{background:linear-gradient(135deg,var(--color-accent),#ff8c00)}
+.modal-hdr.blue{background:linear-gradient(135deg,#1a3f7a,#2563eb)}
+.modal-hdr.purple{background:linear-gradient(135deg,#7c3aed,#a855f7)}
+.modal-title{font-size:16px;font-weight:700;flex:1}
+.modal-close{cursor:pointer;font-size:24px;line-height:1;padding:4px 8px;border-radius:6px}
+.modal-close:hover{background:rgba(255,255,255,.2)}
+.modal-body{flex:1;overflow-y:auto;padding:20px}
+#modal-tabs{display:flex;border-bottom:1px solid #f0f2f5;background:var(--color-bg3)}
+.mtab{font-size:13px;padding:12px 20px;cursor:pointer;color:var(--color-text2);border-bottom:3px solid transparent;font-weight:600;flex:1;text-align:center;transition:all .3s}
+.mtab.on{color:var(--color-accent);border-bottom-color:var(--color-accent);background:var(--color-bg2)}
+
+/* FORMS */
+.form-group{margin-bottom:16px}
+.form-label{font-size:12px;color:var(--color-text2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;display:block;font-weight:700}
+.form-input,.form-select{width:100%;font-size:13px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--border-radius-md);background:var(--color-bg3);color:var(--color-text);outline:none;font-family:var(--font-sans)}
+.form-input:focus,.form-select:focus{border-color:var(--color-accent);box-shadow:0 0 0 3px rgba(239,159,39,.1)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-actions{display:flex;gap:10px;margin-top:20px}
+.btn{font-size:13px;padding:10px 16px;border-radius:var(--border-radius-md);border:1px solid var(--color-border);cursor:pointer;background:transparent;color:var(--color-text);font-family:var(--font-sans);transition:all .3s;font-weight:600;flex:1}
+.btn:hover{background:var(--color-bg3)}
+.btn-orange{background:linear-gradient(135deg,var(--color-accent),#ff8c00);color:white;border:none}
+.btn-orange:hover{opacity:.9}
+.btn-blue{background:linear-gradient(135deg,#1a3f7a,#2563eb);color:white;border:none}
+.btn-blue:hover{opacity:.9}
+.btn-purple{background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;border:none}
+.btn-purple:hover{opacity:.9}
+.btn-danger{color:#e24b4a;border-color:#e24b4a}
+.btn-danger:hover{background:rgba(226,75,74,.1)}
+.cfg-list{display:flex;flex-direction:column;gap:10px}
+.cfg-item{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--color-border);border-radius:var(--border-radius-md);background:var(--color-bg3)}
+.cfg-item-label{flex:1;font-size:13px;color:var(--color-text);font-family:var(--font-mono);font-weight:600}
+.cfg-item-sub{font-size:11px;color:var(--color-text2);margin-top:4px}
+.cfg-item-actions{display:flex;gap:6px;flex-shrink:0}
+.cfg-action-btn{font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid var(--color-border);cursor:pointer;background:transparent;color:var(--color-text2);font-weight:600;transition:all .3s;white-space:nowrap}
+.cfg-action-btn.del{border-color:#e24b4a;color:#e24b4a}
+.cfg-action-btn.edit-cfg{border-color:#7c3aed;color:#7c3aed}
+.section-title{font-size:12px;font-weight:700;color:var(--color-accent);letter-spacing:1px;text-transform:uppercase;margin:20px 0 12px}
+.section-title:first-child{margin-top:0}
+.info-box{background:rgba(21,101,192,.1);border:1px solid rgba(21,101,192,.2);border-radius:var(--border-radius-md);padding:12px;font-size:12px;color:#1565c0;margin-bottom:16px;font-weight:500}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:4px}
+
+/* ═══ MOBILE OPTIMIZATIONS ═══ */
+
+/* Safe area support */
+#app { padding-bottom: 0; }
+#tb { padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+#fabs-mobile { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+
+/* Floating Action Buttons for mobile */
+#fabs-mobile {
+  position: absolute;
+  right: 14px;
+  bottom: 20px;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1800;
+}
+.fab {
+  width: 56px; height: 56px;
+  border-radius: 50%; border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  transition: transform .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.fab:active { transform: scale(.9); }
+#fab-list-btn { background: white; color: var(--color-accent); }
+#fab-locate-btn { background: #4285F4; color: white; }
+#fab-add-btn { background: var(--color-accent); color: white; }
+#fab-add-btn.active { background: #e24b4a; animation: fab-pulse 1.5s infinite; }
+@keyframes fab-pulse {
+  0%,100%{box-shadow:0 4px 16px rgba(226,75,74,.4)}
+  50%{box-shadow:0 4px 28px rgba(226,75,74,.8)}
+}
+
+/* Mobile: bottom sheet for list */
+#sb-sheet {
+  display: none;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--color-bg2);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -4px 24px rgba(0,0,0,.2);
+  z-index: 2000;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform .32s cubic-bezier(.4,0,.2,1);
+  max-height: 78dvh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+#sb-sheet.open { transform: translateY(0); }
+#sb-sheet-handle {
+  width: 40px; height: 4px; background: #ccc; border-radius: 2px;
+  margin: 10px auto 4px; cursor: grab; flex-shrink: 0;
+}
+#sb-sheet-title {
+  font-size: 13px; font-weight: 700; color: var(--color-text);
+  padding: 4px 16px 8px; display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+#sb-sheet-close { font-size: 22px; cursor: pointer; color: var(--color-text2); line-height: 1; }
+
+/* Detail panel - mobile full bottom */
+@media (max-width: 900px) {
+  #dp {
+    left: 0; right: 0; bottom: 0;
+    max-width: none;
+    border-radius: 18px 18px 0 0;
+    padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-left: none; border-right: none; border-bottom: none;
+    max-height: 55dvh;
+    overflow-y: auto;
+  }
+  #dp.vis { display: block; }
+  /* handle bar */
+  #dp::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: #ccc; border-radius: 2px;
+    margin: 10px auto 12px;
+  }
+  #dpmeta { grid-template-columns: 1fr 1fr; }
+  .dab { min-height: 46px; font-size: 12px; padding: 10px 8px; }
+  #dpid { font-size: 18px; }
+
+  /* Map toolbar - hide on mobile (replaced by FABs) */
+  #map-toolbar { display: none; }
+
+  /* FABs visible */
+  #fabs-mobile { display: flex; }
+
+  /* Topbar compact */
+  #tb { flex-wrap: wrap; gap: 8px; padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
+  #bnd { min-width: 0; }
+  #bnm { font-size: 12px; letter-spacing: 1px; }
+  #bsub { font-size: 10px; }
+  #sbar { order: 3; width: 100%; margin-left: 0; justify-content: space-between; gap: 6px; }
+  .sc { min-width: 0; flex: 1; padding: 5px 6px; }
+  .sv { font-size: 15px; }
+  .sl { font-size: 8px; }
+  #cfg-btn { padding: 7px 10px; font-size: 13px; }
+  #rtb { font-size: 9px; padding: 5px 8px; }
+  .logo-tb { height: 28px; }
+
+  /* Body: map full screen, sidebar hidden */
+  #bdy { height: calc(100dvh - var(--tb-h, 110px)); }
+  #sb { display: none; } /* hidden - replaced by sheet */
+  #mapcol { min-height: 0; flex: 1; position: relative; }
+
+  /* Sheet visible */
+  #sb-sheet { display: flex; }
+
+  /* Modals slide from bottom */
+  .overlay { align-items: flex-end; }
+  .modal-box {
+    width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 92dvh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .modal-hdr { padding: 16px 18px 12px; }
+  .modal-body { padding: 14px; }
+  .form-row { grid-template-columns: 1fr; }
+  .form-input, .form-select { font-size: 16px; padding: 13px 12px; min-height: 50px; }
+  .btn { min-height: 50px; font-size: 14px; }
+  .cfg-action-btn { min-height: 40px; font-size: 12px; }
+  .ci { padding: 12px 10px; }
+  .cid { font-size: 13px; }
+  #toast {
+    top: 10px; bottom: auto;
+    left: 50%; right: auto;
+    transform: translateX(-50%);
+    border-radius: 20px;
+    white-space: nowrap;
+    background: rgba(20,20,20,.9);
+    color: white;
+    border: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .dab { flex: none; width: calc(50% - 4px); }
+  #dpmeta { grid-template-columns: 1fr 1fr; }
+}
+
+body.mobile-list-collapsed #sb { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="tb">
+    <div id="bnd">
+      <svg id="bico" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="14" width="12" height="24" rx="4" fill="#ef9f27"/>
+        <rect x="5" y="11" width="8" height="5" rx="2" fill="#d4890f"/>
+        <rect x="7" y="8" width="4" height="4" rx="1" fill="#b8720a"/>
+        <rect x="3" y="32" width="12" height="4" rx="2" fill="#d4890f"/>
+        <rect x="18" y="12" width="13" height="26" rx="4" fill="#1a3f7a"/>
+        <rect x="20" y="9" width="9" height="5" rx="2" fill="#153070"/>
+        <rect x="22.5" y="6" width="4" height="4" rx="1" fill="#0f2050"/>
+        <rect x="18" y="31" width="13" height="5" rx="2" fill="#153070"/>
+        <rect x="34" y="17" width="8" height="19" rx="3" fill="#e24b4a"/>
+        <rect x="35.5" y="14" width="5" height="4" rx="1.5" fill="#c43a39"/>
+        <rect x="36" y="12" width="3" height="3" rx="1" fill="#a82e2d"/>
+        <rect x="34" y="31" width="8" height="3" rx="1.5" fill="#c43a39"/>
+        <circle cx="9" cy="20" r="1.5" fill="rgba(255,255,255,0.5)"/>
+        <circle cx="24.5" cy="18" r="1.5" fill="rgba(255,255,255,0.4)"/>
+      </svg>
+      <div><div id="bnm">LISNAVE</div><div id="bsub">Rastreamento de Garrafas de Gás</div></div>
+    </div>
+    <div id="sbar">
+      <div class="sc" onclick="filterBy('all')"><div class="sv" id="sv0">—</div><div class="sl">Total</div></div>
+      <div class="sc s1" onclick="filterBy('ativa')"><div class="sv" id="sv1">—</div><div class="sl">Ativas</div></div>
+      <div class="sc s2" onclick="filterBy('recolha')"><div class="sv" id="sv2">—</div><div class="sl">Recolha</div></div>
+      <div class="sc s3" onclick="filterBy('recuperada')"><div class="sv" id="sv3">—</div><div class="sl">Recuperadas</div></div>
+    </div>
+    <button id="cfg-btn" onclick="openModal()">⚙️ Configurar</button>
+    <div id="rtb"><div id="rdot"></div>TEMPO REAL</div>
+    <img src="Logotipo_Lisnave.png" alt="Logo" class="logo-tb">
+  </div>
+  <div id="bdy">
+    <div id="sb">
+      <div id="ssr"><input type="text" id="sin" placeholder="🔍 Pesquisar..."/></div>
+      <div id="sfil">
+        <button class="fch on" data-f="all">Todas</button>
+        <button class="fch" data-f="ativa">🔴 Ativas</button>
+        <button class="fch" data-f="recolha">🟠 Recolha</button>
+        <button class="fch" data-f="recuperada">🟢 Recuperadas</button>
+      </div>
+      <div id="szn"><select id="zsel"><option value="">Todas as zonas</option></select></div>
+      <div id="clist"></div>
+    </div>
+    <div id="mapcol">
+      <div id="map"></div>
+      <div id="map-toolbar">
+        <button class="map-btn" id="btn-add-lost" onclick="toggleAddMode()">➕ Adicionar no Mapa</button>
+      </div>
+
+      <!-- Mobile FABs -->
+      <div id="fabs-mobile">
+        <button class="fab" id="fab-list-btn" onclick="toggleMobileSheet()" title="Lista">🗂</button>
+        <button class="fab" id="fab-locate-btn" onclick="centerOnUser()" title="Minha localização">📍</button>
+        <button class="fab" id="fab-add-btn" onclick="toggleAddMode()" title="Adicionar garrafa">➕</button>
+      </div>
+
+      <!-- Mobile bottom sheet list -->
+      <div id="sb-sheet">
+        <div id="sb-sheet-handle"></div>
+        <div id="sb-sheet-title">
+          <span>🗂 Garrafas</span>
+          <span id="sb-sheet-close" onclick="closeMobileSheet()">✕</span>
+        </div>
+        <div style="padding:0 12px 8px;flex-shrink:0">
+          <input id="sin-mobile" type="search" placeholder="🔍 Pesquisar..." style="width:100%;font-size:15px;padding:10px 12px;border:1px solid #e0e5eb;border-radius:10px;background:#f5f7fa;outline:none"/>
+        </div>
+        <div style="display:flex;gap:6px;padding:0 12px 8px;overflow-x:auto;flex-shrink:0;scrollbar-width:none">
+          <button class="fch on" data-fm="all">Todas</button>
+          <button class="fch" data-fm="ativa">🔴 Ativas</button>
+          <button class="fch" data-fm="recolha">🟠 Recolha</button>
+          <button class="fch" data-fm="recuperada">🟢 Recuperadas</button>
+        </div>
+        <div id="mobile-clist" style="flex:1;overflow-y:auto;padding:4px 8px 8px"></div>
+      </div>
+
+      <div id="toast"></div>
+      <div id="dp">
+        <div id="dph"><span id="dpid"></span><span id="dptype"></span><span id="dpclose">✕</span></div>
+        <div id="dpmeta"></div>
+        <div id="dpact"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG MODAL -->
+<div id="modal-overlay" class="overlay">
+  <div class="modal-box" style="width:580px">
+    <div class="modal-hdr orange"><span class="modal-title">⚙️ Configurações</span><span class="modal-close" onclick="closeModal()">✕</span></div>
+    <div id="modal-tabs">
+      <div class="mtab on" onclick="switchTab('garrafas')">Garrafas</div>
+      <div class="mtab" onclick="switchTab('operadores')">Operadores</div>
+      <div class="mtab" onclick="switchTab('dados')">Dados</div>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_ZONES = [
+  {id:'DS1',name:'Doca Seca 1',   lat:38.479, lng:-8.792},
+  {id:'DS2',name:'Doca Seca 2',   lat:38.478, lng:-8.793},
+  {id:'DS3',name:'Doca Seca 3',   lat:38.477, lng:-8.794},
+  {id:'OM', name:'Oficina Mecânica',lat:38.476,lng:-8.792},
+  {id:'OE', name:'Oficina Elétrica',lat:38.476,lng:-8.793},
+  {id:'AC', name:'Armazém Central',lat:38.476,lng:-8.794},
+  {id:'PIN',name:'Pintura Naval',  lat:38.475,lng:-8.795},
+  {id:'CAIS',name:'Cais Principal',lat:38.474,lng:-8.793},
+];
+const DEFAULT_WORKERS = ['J. Ferreira','M. Santos','R. Costa','A. Lopes','C. Mendes','P. Sousa'];
+const DEFAULT_CYLINDERS = [
+  {id:'GAS-001',type:'Acetileno',zoneId:'DS1',lat:38.479,  lng:-8.792, status:'ativa',     ts:'01/01/2025',worker:'J. Ferreira',pres:145},
+  {id:'GAS-002',type:'Oxigénio', zoneId:'DS1',lat:38.4791, lng:-8.7921,status:'recolha',   ts:'15/01/2025',worker:'M. Santos',  pres:198},
+  {id:'GAS-003',type:'Propano',  zoneId:'DS2',lat:38.478,  lng:-8.793, status:'ativa',     ts:'20/01/2025',worker:'R. Costa',   pres:87},
+  {id:'GAS-004',type:'Acetileno',zoneId:'DS2',lat:38.4781, lng:-8.7931,status:'recuperada',ts:'05/02/2025',worker:'A. Lopes',   pres:0},
+  {id:'GAS-005',type:'CO₂',     zoneId:'DS3',lat:38.477,  lng:-8.794, status:'ativa',     ts:'10/02/2025',worker:'C. Mendes',  pres:220},
+  {id:'GAS-006',type:'Árgon',   zoneId:'DS3',lat:38.4771, lng:-8.7941,status:'ativa',     ts:'14/02/2025',worker:'P. Sousa',   pres:175},
+  {id:'GAS-007',type:'Oxigénio', zoneId:'OM', lat:38.476,  lng:-8.792, status:'recolha',   ts:'01/03/2025',worker:'J. Ferreira',pres:134},
+  {id:'GAS-008',type:'Acetileno',zoneId:'OE', lat:38.476,  lng:-8.793, status:'ativa',     ts:'10/03/2025',worker:'M. Santos',  pres:156},
+  {id:'GAS-009',type:'Propano',  zoneId:'AC', lat:38.476,  lng:-8.794, status:'recuperada',ts:'20/03/2025',worker:'R. Costa',   pres:0},
+  {id:'GAS-010',type:'CO₂',     zoneId:'PIN',lat:38.475,  lng:-8.795, status:'ativa',     ts:'01/04/2025',worker:'A. Lopes',   pres:201},
+  {id:'GAS-011',type:'Árgon',   zoneId:'CAIS',lat:38.474, lng:-8.793, status:'recolha',   ts:'10/04/2025',worker:'C. Mendes',  pres:88},
+  {id:'GAS-012',type:'Acetileno',zoneId:'DS1',lat:38.4792, lng:-8.7922,status:'ativa',     ts:'15/04/2025',worker:'P. Sousa',   pres:167},
+];
+const STATUS_COLORS = {ativa:'#e24b4a',recolha:'#ef9f27',recuperada:'#639922'};
+const STATUS_LABELS = {ativa:'Ativa',recolha:'Em Recolha',recuperada:'Recuperada'};
+const BASE_TYPES = ['Acetileno','Oxigénio','Propano','CO₂','Árgon'];
+
+// Função segura para carregar dados com validação
+function safeLoadData() {
+  try {
+    const stored = localStorage.getItem('lisnave_data');
+    if (!stored) {
+      console.log('Nenhum dado encontrado, usando padrões');
+      return {
+        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
+        workers: [...DEFAULT_WORKERS]
+      };
+    }
+    
+    const data = JSON.parse(stored);
+    
+    // Validar estrutura
+    if (!data.cylinders || !Array.isArray(data.cylinders)) {
+      console.warn('Dados de cilindros inválidos, usando padrões');
+      return {
+        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
+        workers: data.workers || [...DEFAULT_WORKERS]
+      };
+    }
+    
+    // Validar cada cilindro
+    const validCylinders = data.cylinders.filter(c => 
+      c && c.id && c.lat && c.lng && c.status && 
+      typeof c.lat === 'number' && typeof c.lng === 'number'
+    );
+    
+    if (validCylinders.length === 0) {
+      console.warn('Nenhum cilindro válido encontrado, usando padrões');
+      return {
+        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
+        workers: data.workers || [...DEFAULT_WORKERS]
+      };
+    }
+    
+    if (validCylinders.length !== data.cylinders.length) {
+      console.warn(`Removidos ${data.cylinders.length - validCylinders.length} cilindros inválidos`);
+    }
+    
+    return {
+      cylinders: validCylinders,
+      workers: data.workers || [...DEFAULT_WORKERS]
+    };
+    
+  } catch (error) {
+    console.error('Erro ao carregar dados:', error);
+    return {
+      cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
+      workers: [...DEFAULT_WORKERS]
+    };
+  }
+}
+
+const data = safeLoadData();
+let cylinders = data.cylinders;
+let workers = data.workers;
+let selectedId=null, filterStatus='all', filterZone='', searchText='';
+let addingMode=false, pendingLat=null, pendingLng=null;
+let bottleMarkers=new Map(), editingId=null;
+let map, userMarker=null;
+let satelliteLayer=null, offlineOverlay=null, usingOfflineBase=false;
+const LISNAVE_BOUNDS = [
+  [38.4729, -8.7963],
+  [38.4806, -8.7906]
+];
+
+const zsel=document.getElementById('zsel');
+DEFAULT_ZONES.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.name;zsel.appendChild(o);});
+
+function now(){return new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function saveData(){localStorage.setItem('lisnave_data',JSON.stringify({cylinders,workers}));}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3000);}
+
+// ── STATS ──
+function updateStats(){
+  document.getElementById('sv0').textContent=cylinders.length;
+  document.getElementById('sv1').textContent=cylinders.filter(c=>c.status==='ativa').length;
+  document.getElementById('sv2').textContent=cylinders.filter(c=>c.status==='recolha').length;
+  document.getElementById('sv3').textContent=cylinders.filter(c=>c.status==='recuperada').length;
+}
+
+// ── FILTER ──
+function filterBy(status){
+  filterStatus=status;
+  document.querySelectorAll('#sbar .sc').forEach((el,i)=>el.classList.toggle('active',['all','ativa','recolha','recuperada'][i]===status));
+  document.querySelectorAll('.fch').forEach(b=>b.classList.toggle('on',b.dataset.f===status));
+  renderList();updateMapMarkers();
+  const msgs={all:'📊 Todas as garrafas',ativa:'🔴 Apenas Ativas',recolha:'🟠 Apenas Em Recolha',recuperada:'🟢 Apenas Recuperadas'};
+  showToast(msgs[status]);
+}
+
+function getFiltered(){
+  return cylinders.filter(c=>{
+    if(filterStatus!=='all'&&c.status!==filterStatus)return false;
+    if(filterZone&&c.zoneId!==filterZone)return false;
+    if(searchText){const q=searchText.toLowerCase();const zn=DEFAULT_ZONES.find(z=>z.id===c.zoneId);if(!c.id.toLowerCase().includes(q)&&!c.type.toLowerCase().includes(q)&&!(zn&&zn.name.toLowerCase().includes(q)))return false;}
+    return true;
+  });
+}
+
+// ── LIST ──
+function renderList(){
+  const list=document.getElementById('clist');
+  const filtered=getFiltered();
+  if(!filtered.length){list.innerHTML='<div style="padding:20px;text-align:center;color:#aaa;">📭 Sem resultados</div>';return;}
+  list.innerHTML=filtered.map(c=>{
+    const zn=DEFAULT_ZONES.find(z=>z.id===c.zoneId);
+    return`<div class="ci${c.id===selectedId?' sel':''}" data-id="${c.id}">
+      <div class="cd" style="background:${STATUS_COLORS[c.status]}"></div>
+      <div class="cinf"><div class="cid">${c.id}</div><div class="csub">${c.type} · ${zn?zn.name:c.zoneId}</div></div>
+      <div class="cst ${c.status}">${STATUS_LABELS[c.status]}</div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.ci').forEach(el=>el.addEventListener('click',()=>selectCylinder(el.dataset.id)));
+}
+
+// ── DETAIL ──
+function renderDetail(){
+  const dp=document.getElementById('dp');
+  if(!selectedId){dp.classList.remove('vis');return;}
+  const c=cylinders.find(x=>x.id===selectedId);
+  if(!c){dp.classList.remove('vis');return;}
+  const zn=DEFAULT_ZONES.find(z=>z.id===c.zoneId);
+  dp.classList.add('vis');
+  document.getElementById('dpid').textContent=c.id;
+  document.getElementById('dptype').textContent='· '+c.type;
+  document.getElementById('dpmeta').innerHTML=`
+    <div class="dm"><div class="dml">Zona</div><div class="dmv">${zn?zn.name:c.zoneId}</div></div>
+    <div class="dm"><div class="dml">Estado</div><div class="dmv" style="color:${STATUS_COLORS[c.status]}">${STATUS_LABELS[c.status]}</div></div>
+    <div class="dm"><div class="dml">Pressão</div><div class="dmv">${c.pres>0?c.pres+' bar':'—'}</div></div>
+    <div class="dm"><div class="dml">Operador</div><div class="dmv">${c.worker}</div></div>
+    <div class="dm" style="grid-column:1/-1"><div class="dml">📅 Data de Introdução</div><div class="dmv">${c.ts||'—'}</div></div>`;
+  const acts=[];
+  acts.push(`<button class="dab edit-btn" onclick="openEdit('${c.id}')">✏️ Editar</button>`);
+  if(c.status==='ativa')      acts.push(`<button class="dab w" onclick="setStatus('${c.id}','recolha')">📤 Recolha</button>`);
+  if(c.status==='recolha')    acts.push(`<button class="dab s" onclick="setStatus('${c.id}','recuperada')">✓ Recuperada</button>`);
+  if(c.status==='recuperada') acts.push(`<button class="dab r" onclick="setStatus('${c.id}','ativa')">▶ Serviço</button>`);
+  acts.push(`<button class="dab danger" onclick="deleteCylinder('${c.id}')">🗑 Remover</button>`);
+  document.getElementById('dpact').innerHTML=acts.join('');
+  updateMapMarkers();
+}
+
+function selectCylinder(id){
+  selectedId=selectedId===id?null:id;
+  renderList();renderDetail();
+  if(!selectedId||!map)return;
+  const c=cylinders.find(x=>x.id===selectedId);
+  if(!c)return;
+  map.flyTo([c.lat,c.lng],Math.max(map.getZoom(),18),{duration:0.6});
+  const marker=bottleMarkers.get(c.id);
+  if(marker)marker.openPopup();
+}
+
+window.setStatus=function(id,status){
+  const c=cylinders.find(x=>x.id===id);
+  if(c){c.status=status;if(status==='recuperada')c.pres=0;}
+  saveData();updateStats();renderList();renderDetail();showToast(`${id} → ${STATUS_LABELS[status]}`);
+};
+window.deleteCylinder=function(id){
+  if(!confirm(`Remover ${id}?`))return;
+  cylinders=cylinders.filter(c=>c.id!==id);selectedId=null;
+  saveData();updateStats();renderList();renderDetail();updateMapMarkers();showToast(`${id} removida`);
+};
+
+// ── EVENTS ──
+document.getElementById('sin').addEventListener('input',e=>{searchText=e.target.value;renderList();updateMapMarkers();});
+document.querySelectorAll('.fch').forEach(btn=>btn.addEventListener('click',()=>filterBy(btn.dataset.f)));
+zsel.addEventListener('change',e=>{filterZone=e.target.value;renderList();updateMapMarkers();});
+document.getElementById('dpclose').addEventListener('click',()=>{selectedId=null;renderList();renderDetail();updateMapMarkers();});
+document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
+
+// ── CONFIG MODAL ──
+let currentTab='garrafas';
+function openModal(){document.getElementById('modal-overlay').classList.add('open');switchTab('garrafas');}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function switchTab(tab){currentTab=tab;document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',['garrafas','operadores','dados'][i]===tab));renderModalBody();}
+
+function renderModalBody(){
+  const body=document.getElementById('modal-body');
+  if(currentTab==='garrafas'){
+    body.innerHTML=`<div class="info-box">Garrafas existentes (${cylinders.length})</div>
+      <div class="cfg-list">${cylinders.map(c=>{
+        const zn=DEFAULT_ZONES.find(z=>z.id===c.zoneId);
+        return`<div class="cfg-item">
+          <div style="flex:1"><div class="cfg-item-label">${c.id}</div>
+          <div class="cfg-item-sub">${c.type} · ${zn?zn.name:c.zoneId} · <span style="color:${STATUS_COLORS[c.status]}">${STATUS_LABELS[c.status]}</span>${c.ts?` · 📅 ${c.ts}`:''}</div></div>
+          <div class="cfg-item-actions">
+            <button class="cfg-action-btn del" onclick="if(confirm('Remover ${c.id}?')){cylinders=cylinders.filter(x=>x.id!==c.id);saveData();updateStats();renderList();updateMapMarkers();renderModalBody();showToast('${c.id} removida');}">🗑</button>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+  } else if(currentTab==='operadores'){
+    body.innerHTML=`<div class="info-box">Operadores disponíveis</div>
+      <div class="cfg-list">${workers.map((w,i)=>`<div class="cfg-item"><div class="cfg-item-label" style="flex:1">👤 ${w}</div></div>`).join('')}</div>`;
+  } else {
+    body.innerHTML=`<div class="info-box">Exporta, importa ou repõe os dados da aplicação.</div>
+      <button class="btn btn-orange" style="margin-bottom:10px;width:100%" onclick="exportData()">⬇ Exportar JSON</button>
+      <button class="btn btn-danger" style="width:100%" onclick="if(confirm('Repor todos os dados originais?')){localStorage.removeItem('lisnave_data');location.reload();}">⚠ Repor Dados de Fábrica</button>`;
+  }
+}
+
+window.exportData=function(){const blob=new Blob([JSON.stringify({cylinders,workers},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lisnave_${new Date().toISOString().slice(0,10)}.json`;a.click();};
+
+// ── ADD ON MAP ──
+function toggleAddMode(){
+  addingMode=!addingMode;
+  document.getElementById('btn-add-lost')?.classList.toggle('active',addingMode);
+  // Sync mobile FAB
+  const fab=document.getElementById('fab-add-btn');
+  if(fab){fab.classList.toggle('active',addingMode);fab.textContent=addingMode?'✕':'➕';}
+  if(addingMode){
+    showToast('🗺️ Clica no mapa para posicionar a garrafa',4000);
+  } else {
+    showToast('❌ Modo adição cancelado');
+  }
+}
+
+function cancelAdd(){
+  document.getElementById('add-overlay').classList.remove('open');
+  pendingLat=null;pendingLng=null;addingMode=false;
+  document.getElementById('btn-add-lost')?.classList.remove('active');
+  // 🔧 CORREÇÃO: Atualizar FAB button do mobile para voltar ao ➕
+  const fab=document.getElementById('fab-add-btn');
+  if(fab){
+    fab.classList.remove('active');
+    fab.textContent='➕';
+  }
+}
+
+// Mobile bottom sheet
+function toggleMobileSheet(){
+  const s=document.getElementById('sb-sheet');
+  if(s.classList.contains('open'))closeMobileSheet();
+  else openMobileSheet();
+}
+function openMobileSheet(){
+  renderMobileList();
+  document.getElementById('sb-sheet').classList.add('open');
+}
+function closeMobileSheet(){
+  document.getElementById('sb-sheet').classList.remove('open');
+  setTimeout(()=>{if(map)map.invalidateSize();},120);
+}
+
+// Render list in mobile sheet
+function renderMobileList(){
+  const list=document.getElementById('mobile-clist');
+  if(!list)return;
+  const filtered=getFiltered();
+  if(!filtered.length){list.innerHTML='<div style="padding:20px;text-align:center;color:#aaa;font-size:13px">📭 Sem resultados</div>';return;}
+  list.innerHTML=filtered.map(c=>{
+    const zn=DEFAULT_ZONES.find(z=>z.id===c.zoneId);
+    return`<div class="ci${c.id===selectedId?' sel':''}" data-id="${c.id}" style="margin-bottom:6px">
+      <div class="cd" style="background:${STATUS_COLORS[c.status]};width:12px;height:12px"></div>
+      <div class="cinf"><div class="cid" style="font-size:13px">${c.id}</div><div class="csub">${c.type} · ${zn?zn.name:c.zoneId}</div></div>
+      <div class="cst ${c.status}">${STATUS_LABELS[c.status]}</div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.ci').forEach(el=>el.addEventListener('click',()=>{
+    selectCylinder(el.dataset.id);
+    closeMobileSheet();
+  }));
+}
+
+// Center on user location
+function centerOnUser(){
+  if(userMarker){
+    map.flyTo(userMarker.getLatLng(),Math.max(map.getZoom(),18),{duration:.8});
+    showToast('📍 A centrar na tua localização...');
+  } else {
+    showToast('⚠️ GPS ainda não disponível');
+  }
+}
+
+function openAddModal(lat,lng){
+  pendingLat=lat;pendingLng=lng;
+  const suggestedId=`GAS-${String(cylinders.length+1).padStart(3,'0')}`;
+  // Simplificado - sem modal complexo para teste rápido
+  const type='Acetileno';
+  const zoneId='DS1';
+  const zone=DEFAULT_ZONES.find(z=>z.id===zoneId);
+  cylinders.push({id:suggestedId,type,zoneId,lat:pendingLat,lng:pendingLng,status:'ativa',ts:now(),worker:'J. Ferreira',pres:150});
+  saveData();updateStats();renderList();updateMapMarkers();
+  cancelAdd();showToast(`✅ ${suggestedId} adicionada`);
+}
+
+function initMap(){
+  console.log('Iniciando mapa...');
+  
+  // Verificar se o elemento do mapa existe
+  const mapContainer = document.getElementById('map');
+  if (!mapContainer) {
+    console.error('Elemento do mapa não encontrado');
+    showToast('❌ Erro: elemento do mapa não encontrado');
+    return;
+  }
+  
+  try {
+    map=L.map('map',{zoomControl:true,attributionControl:true,minZoom:14,maxZoom:19}).setView([38.4777,-8.7934],17);
+    console.log('Mapa criado com sucesso');
+    
+    satelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+      maxZoom:19,
+      maxNativeZoom:19,
+      noWrap:true,
+      attribution:'Tiles &copy; Esri'
+    });
+    
+    offlineOverlay=L.imageOverlay('lisnave_sat_offline.png',LISNAVE_BOUNDS,{opacity:1,interactive:false});
+    
+    const applyBaseLayer=(isOnline)=>{
+      const useOffline=!isOnline;
+      if(map.hasLayer(satelliteLayer))map.removeLayer(satelliteLayer);
+      if(map.hasLayer(offlineOverlay))map.removeLayer(offlineOverlay);
+      if(useOffline){
+        map.setMinZoom(14);map.setMaxZoom(22);
+        offlineOverlay.addTo(map);
+        if(!usingOfflineBase)showToast('📴 Modo offline: imagem satélite estática');
+      }else{
+        map.setMinZoom(14);map.setMaxZoom(19);
+        satelliteLayer.addTo(map);
+        if(usingOfflineBase)showToast('🌐 Modo online: satélite em tempo real');
+      }
+      usingOfflineBase=useOffline;
+    };
+    
+    applyBaseLayer(navigator.onLine);
+    window.addEventListener('online',()=>applyBaseLayer(true));
+    window.addEventListener('offline',()=>applyBaseLayer(false));
+    
+    updateMapMarkers();
+    showToast('🗺️ Mapa carregado com sucesso');
+    
+  } catch (error) {
+    console.error('Erro ao inicializar mapa:', error);
+    showToast('❌ Erro ao carregar mapa: ' + error.message);
+  }
+}
+
+function updateMapMarkers(){
+  if(!map){
+    console.warn('Mapa não disponível para atualizar marcadores');
+    return;
+  }
+  
+  console.log(`Atualizando ${cylinders.length} marcadores...`);
+  
+  // Limpar marcadores existentes
+  bottleMarkers.forEach(m=>map.removeLayer(m));
+  bottleMarkers.clear();
+  
+  const filtered=getFiltered();
+  const filteredIds=new Set(filtered.map(c=>c.id));
+  
+  cylinders.forEach(cyl=>{
+    const isF=filteredIds.has(cyl.id);
+    const isSel=cyl.id===selectedId;
+    const radius=isSel?14:isF?8:5;
+    
+    const marker=L.circleMarker([cyl.lat,cyl.lng],{
+      radius,
+      color:'#ffffff',
+      weight:isSel?3:2,
+      fillColor:STATUS_COLORS[cyl.status],
+      fillOpacity:isF?0.95:0.3,
+      opacity:isF?1:0.35
+    }).addTo(map);
+    
+    const zn=DEFAULT_ZONES.find(z=>z.id===cyl.zoneId);
+    marker.bindPopup(`<div style="font-family:sans-serif;min-width:160px"><div style="font-weight:700;color:${STATUS_COLORS[cyl.status]};font-size:14px;margin-bottom:8px">${cyl.id}</div><div style="font-size:12px;line-height:1.8"><div><b>Tipo:</b> ${cyl.type}</div><div><b>Zona:</b> ${zn?zn.name:cyl.zoneId}</div><div><b>Estado:</b> ${STATUS_LABELS[cyl.status]}</div><div><b>Operador:</b> ${cyl.worker}</div><div><b>Pressão:</b> ${cyl.pres>0?cyl.pres+' bar':'—'}</div><div><b>Data:</b> ${cyl.ts}</div></div></div>`);
+    marker.on('click',()=>selectCylinder(cyl.id));
+    bottleMarkers.set(cyl.id,marker);
+  });
+  
+  console.log(`${bottleMarkers.size} marcadores adicionados ao mapa`);
+}
+
+// Inicialização
+updateStats();renderList();renderDetail();
+
+// Aguardar o DOM estar completamente carregado antes de inicializar o mapa
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => initMap(), 100);
+  });
+} else {
+  setTimeout(() => initMap(), 100);
+}
+
+// Wire mobile search
+document.getElementById('sin-mobile')?.addEventListener('input',e=>{
+  searchText=e.target.value;
+  document.getElementById('sin').value=e.target.value;
+  renderList();renderMobileList();updateMapMarkers();
+});
+// Wire mobile filter buttons
+document.querySelectorAll('[data-fm]').forEach(btn=>btn.addEventListener('click',()=>{
+  filterBy(btn.dataset.fm);
+  renderMobileList();
+}));
+// Sync desktop search to mobile
+document.getElementById('sin').addEventListener('input',e=>{
+  const m=document.getElementById('sin-mobile');
+  if(m)m.value=e.target.value;
+});
+
+// Invalidar mapa ao redimensionar
+window.addEventListener('resize',()=>{if(map)setTimeout(()=>map.invalidateSize(),100);});
+</script>
+</body>
+</html>

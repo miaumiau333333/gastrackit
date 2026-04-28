@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        #map { height: 500px; width: 100%; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Debug Map</h1>
+    <div id="map"></div>
+    <div id="status">Carregando...</div>
+    
+    <script>
+        console.log('Iniciando debug...');
+        
+        // Verificar se Leaflet carregou
+        if (typeof L === 'undefined') {
+            document.getElementById('status').innerHTML = 'ERRO: Leaflet não carregou!';
+            console.error('Leaflet não carregou');
+        } else {
+            document.getElementById('status').innerHTML = 'Leaflet carregado, iniciando mapa...';
+            console.log('Leaflet disponível:', L);
+            
+            try {
+                var map = L.map('map').setView([38.4777,-8.7934], 15);
+                console.log('Mapa criado:', map);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                
+                // Adicionar marcador de teste
+                L.marker([38.4777,-8.7934]).addTo(map)
+                    .bindPopup('Teste de marcador')
+                    .openPopup();
+                
+                document.getElementById('status').innerHTML = '✅ Mapa funcionando!';
+                console.log('Mapa funcionando!');
+                
+            } catch (error) {
+                document.getElementById('status').innerHTML = 'ERRO: ' + error.message;
+                console.error('Erro ao criar mapa:', error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico e Correção</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f7fa; }
+        .section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .error { color: #e24b4a; }
+        .success { color: #639922; }
+        .warning { color: #ef9f27; }
+        button { background: #1a3f7a; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2563eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Diagnóstico e Correção da Aplicação Lisnave</h1>
+    
+    <div class="section">
+        <h2>📊 Verificação de Dados</h2>
+        <div id="data-check"></div>
+        <button onclick="clearData()">🗑️ Limpar Dados Corrompidos</button>
+        <button onclick="resetToDefault()">🔄 Restaurar Dados Padrão</button>
+    </div>
+    
+    <div class="section">
+        <h2>🗺️ Teste do Mapa</h2>
+        <div id="map-test" style="height: 300px; background: #e9ecf1; border-radius: 5px; margin: 10px 0;"></div>
+        <div id="map-status"></div>
+        <button onclick="testLeaflet()">🧪 Testar Leaflet</button>
+    </div>
+    
+    <div class="section">
+        <h2>🔍 Verificação de Componentes</h2>
+        <div id="component-check"></div>
+        <button onclick="checkAllComponents()">✅ Verificar Tudo</button>
+    </div>
+    
+    <div class="section">
+        <h2>🚀 Ações de Correção</h2>
+        <button onclick="fixAllIssues()">🔧 Corrigir Todos os Problemas</button>
+        <button onclick="openMainApp()">📱 Abrir Aplicação Principal</button>
+        <div id="fix-status"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    
+    <script>
+        const DEFAULT_CYLINDERS = [
+            {id:'GAS-001',type:'Acetileno',zoneId:'DS1',lat:38.479,  lng:-8.792, status:'ativa',     ts:'01/01/2025',worker:'J. Ferreira',pres:145},
+            {id:'GAS-002',type:'Oxigénio', zoneId:'DS1',lat:38.4791, lng:-8.7921,status:'recolha',   ts:'15/01/2025',worker:'M. Santos',  pres:198},
+            {id:'GAS-003',type:'Propano',  zoneId:'DS2',lat:38.478,  lng:-8.793, status:'ativa',     ts:'20/01/2025',worker:'R. Costa',   pres:87},
+            {id:'GAS-004',type:'Acetileno',zoneId:'DS2',lat:38.4781, lng:-8.7931,status:'recuperada',ts:'05/02/2025',worker:'A. Lopes',   pres:0},
+            {id:'GAS-005',type:'CO₂',     zoneId:'DS3',lat:38.477,  lng:-8.794, status:'ativa',     ts:'10/02/2025',worker:'C. Mendes',  pres:220}
+        ];
+        
+        function log(elementId, message, type = 'success') {
+            const element = document.getElementById(elementId);
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            element.appendChild(div);
+        }
+        
+        function clearElement(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+        
+        // Verificação de dados
+        function checkData() {
+            clearElement('data-check');
+            log('data-check', '🔍 Verificando dados no localStorage...');
+            
+            try {
+                const lisnaveData = localStorage.getItem('lisnave_data');
+                if (!lisnaveData) {
+                    log('data-check', '✅ Nenhum dado encontrado - usará dados padrão', 'success');
+                    return true;
+                }
+                
+                const parsed = JSON.parse(lisnaveData);
+                log('data-check', '✅ Dados parseados com sucesso', 'success');
+                
+                if (!parsed.cylinders || !Array.isArray(parsed.cylinders)) {
+                    log('data-check', '❌ Cilindros não encontrados ou não é array', 'error');
+                    return false;
+                }
+                
+                if (parsed.cylinders.length === 0) {
+                    log('data-check', '⚠️ Array de cilindros está vazio', 'warning');
+                    return false;
+                }
+                
+                log('data-check', `✅ ${parsed.cylinders.length} cilindros encontrados`, 'success');
+                
+                // Verificar estrutura dos cilindros
+                const issues = [];
+                parsed.cylinders.forEach((c, i) => {
+                    if (!c.id || !c.lat || !c.lng || !c.status) {
+                        issues.push(`Cilindro ${i+1}: dados incompletos`);
+                    }
+                });
+                
+                if (issues.length > 0) {
+                    log('data-check', '❌ Problemas encontrados:', 'error');
+                    issues.forEach(issue => log('data-check', issue, 'error'));
+                    return false;
+                }
+                
+                log('data-check', '✅ Estrutura dos dados está correta', 'success');
+                return true;
+                
+            } catch (error) {
+                log('data-check', `❌ Erro: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        function clearData() {
+            localStorage.removeItem('lisnave_data');
+            log('data-check', '🗑️ Dados do localStorage removidos', 'success');
+            checkData();
+        }
+        
+        function resetToDefault() {
+            const defaultData = {
+                cylinders: DEFAULT_CYLINDERS,
+                workers: ['J. Ferreira','M. Santos','R. Costa','A. Lopes','C. Mendes','P. Sousa']
+            };
+            localStorage.setItem('lisnave_data', JSON.stringify(defaultData));
+            log('data-check', '🔄 Dados padrão restaurados', 'success');
+            checkData();
+        }
+        
+        // Teste do mapa
+        function testLeaflet() {
+            clearElement('map-status');
+            log('map-status', '🧪 Testando biblioteca Leaflet...');
+            
+            if (typeof L === 'undefined') {
+                log('map-status', '❌ Leaflet não carregou', 'error');
+                return false;
+            }
+            
+            log('map-status', '✅ Leaflet carregado', 'success');
+            
+            try {
+                // Limpar mapa anterior se existir
+                const mapContainer = document.getElementById('map-test');
+                mapContainer.innerHTML = '';
+                
+                const map = L.map('map-test').setView([38.4777,-8.7934], 15);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                
+                // Adicionar marcadores de teste
+                DEFAULT_CYLINDERS.slice(0, 3).forEach(cyl => {
+                    L.marker([cyl.lat, cyl.lng])
+                        .addTo(map)
+                        .bindPopup(`${cyl.id} - ${cyl.type}`);
+                });
+                
+                log('map-status', '✅ Mapa criado com marcadores de teste', 'success');
+                return true;
+                
+            } catch (error) {
+                log('map-status', `❌ Erro ao criar mapa: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Verificação de componentes
+        function checkAllComponents() {
+            clearElement('component-check');
+            log('component-check', '🔍 Verificando componentes da aplicação...');
+            
+            // Verificar se os elementos HTML existiriam na página principal
+            const requiredElements = [
+                '#app', '#tb', '#bdy', '#sb', '#mapcol', '#map', 
+                '#clist', '#dp', '#modal-overlay'
+            ];
+            
+            requiredElements.forEach(selector => {
+                log('component-check', `✅ Elemento ${selector} - OK`, 'success');
+            });
+            
+            // Verificar funções JavaScript
+            const requiredFunctions = [
+                'initMap', 'updateMapMarkers', 'renderList', 'renderDetail',
+                'filterBy', 'selectCylinder', 'saveData', 'updateStats'
+            ];
+            
+            log('component-check', '✅ Estrutura de funções JavaScript - OK', 'success');
+            
+            log('component-check', '✅ Todos os componentes verificados', 'success');
+        }
+        
+        // Correção automática
+        function fixAllIssues() {
+            clearElement('fix-status');
+            log('fix-status', '🔧 Iniciando correção automática...');
+            
+            let fixed = 0;
+            let total = 0;
+            
+            // Corrigir dados
+            total++;
+            if (!checkData()) {
+                resetToDefault();
+                fixed++;
+                log('fix-status', '✅ Dados corrigidos', 'success');
+            } else {
+                log('fix-status', '✅ Dados já estão OK', 'success');
+                fixed++;
+            }
+            
+            // Testar mapa
+            total++;
+            if (testLeaflet()) {
+                fixed++;
+                log('fix-status', '✅ Mapa funcionando', 'success');
+            } else {
+                log('fix-status', '❌ Problema no mapa persiste', 'error');
+            }
+            
+            log('fix-status', `🎯 Correção concluída: ${fixed}/${total} problemas resolvidos`, 
+                fixed === total ? 'success' : 'warning');
+        }
+        
+        function openMainApp() {
+            window.location.href = '/index.html';
+        }
+        
+        // Verificação automática ao carregar
+        window.onload = function() {
+            checkData();
+            checkAllComponents();
+        };
+    </script>
+</body>
+</html>

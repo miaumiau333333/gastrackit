@@ -1,0 +1,375 @@
+
+<h2 class="sr-only">Sistema de localização e rastreamento de garrafas de gás no estaleiro Lisnave — mapa interativo com posições em tempo real e gestão de recuperação</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#app{font-family:var(--font-sans);height:670px;display:flex;flex-direction:column;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+#tb{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);flex-shrink:0}
+#bnd{display:flex;align-items:center;gap:9px}
+#bico{width:30px;height:30px;background:var(--color-background-warning);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--color-text-warning);letter-spacing:1px;flex-shrink:0}
+#bnm{font-size:12px;font-weight:500;letter-spacing:2px;color:var(--color-text-primary)}
+#bsub{font-size:10px;color:var(--color-text-secondary);margin-top:1px}
+#sbar{display:flex;gap:8px;margin-left:auto}
+.sc{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:5px 12px;text-align:center;min-width:64px}
+.sv{font-size:20px;font-weight:500;color:var(--color-text-primary);font-family:var(--font-mono);line-height:1.2}
+.sl{font-size:9px;color:var(--color-text-secondary);letter-spacing:.5px;text-transform:uppercase}
+.sc.s1 .sv{color:var(--color-text-danger)}
+.sc.s2 .sv{color:var(--color-text-warning)}
+.sc.s3 .sv{color:var(--color-text-success)}
+#rtb{font-size:10px;color:var(--color-text-success);letter-spacing:1px;white-space:nowrap;display:flex;align-items:center;gap:5px}
+#rdot{width:6px;height:6px;border-radius:50%;background:var(--color-background-success);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+#bdy{display:flex;flex:1;min-height:0}
+#sb{width:258px;flex-shrink:0;border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;min-height:0}
+#ssr{padding:9px 10px 8px;border-bottom:0.5px solid var(--color-border-tertiary)}
+#ssr input{width:100%;font-size:12px;padding:6px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary)}
+#sfil{display:flex;gap:5px;padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.fch{font-size:10px;padding:3px 9px;border-radius:100px;border:0.5px solid var(--color-border-secondary);background:transparent;cursor:pointer;color:var(--color-text-secondary)}
+.fch.on{background:var(--color-background-secondary);color:var(--color-text-primary);border-color:var(--color-border-primary)}
+#szn{padding:6px 10px;border-bottom:0.5px solid var(--color-border-tertiary)}
+#szn select{width:100%;font-size:11px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-secondary)}
+#clist{flex:1;overflow-y:auto;padding:5px}
+.ci{padding:7px 9px;border-radius:var(--border-radius-md);cursor:pointer;border:0.5px solid transparent;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.ci:hover{background:var(--color-background-secondary)}
+.ci.sel{background:var(--color-background-secondary);border-color:var(--color-border-secondary)}
+.cd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cinf{flex:1;min-width:0}
+.cid{font-size:11px;font-weight:500;font-family:var(--font-mono);color:var(--color-text-primary)}
+.csub{font-size:10px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cst{font-size:9px;padding:2px 6px;border-radius:100px;flex-shrink:0}
+.cst.ativa{background:var(--color-background-danger);color:var(--color-text-danger)}
+.cst.recolha{background:var(--color-background-warning);color:var(--color-text-warning)}
+.cst.recuperada{background:var(--color-background-success);color:var(--color-text-success)}
+#mapcol{flex:1;display:flex;flex-direction:column;min-height:0}
+#mhdr{padding:7px 14px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#mhtitle{font-size:10px;font-weight:500;color:var(--color-text-secondary);letter-spacing:1px}
+#mleg{display:flex;gap:10px}
+.ml{font-size:10px;color:var(--color-text-secondary);display:flex;align-items:center;gap:4px}
+.mld{width:7px;height:7px;border-radius:50%}
+#mwrap{flex:1;position:relative;min-height:150px}
+#cnv{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default}
+#dp{flex-shrink:0;border-top:0.5px solid var(--color-border-tertiary);padding:10px 14px;display:none}
+#dp.vis{display:block}
+#dph{display:flex;align-items:center;margin-bottom:8px;gap:6px}
+#dpid{font-size:15px;font-weight:500;font-family:var(--font-mono);color:var(--color-text-primary)}
+#dptype{font-size:11px;color:var(--color-text-secondary)}
+#dpclose{margin-left:auto;cursor:pointer;font-size:18px;color:var(--color-text-secondary);line-height:1;padding:0 2px}
+#dpmeta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:8px}
+.dm{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 8px}
+.dml{font-size:9px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.dmv{font-size:12px;font-weight:500;color:var(--color-text-primary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dpact{display:flex;gap:7px;flex-wrap:wrap}
+.dab{font-size:11px;padding:5px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);cursor:pointer;background:transparent;color:var(--color-text-primary)}
+.dab:hover{background:var(--color-background-secondary)}
+.dab.w{border-color:var(--color-border-warning);color:var(--color-text-warning)}
+.dab.s{border-color:var(--color-border-success);color:var(--color-text-success)}
+.dab.r{border-color:var(--color-border-info);color:var(--color-text-info)}
+#nores{padding:20px;text-align:center;font-size:12px;color:var(--color-text-tertiary)}
+#toast{position:absolute;bottom:8px;right:8px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:6px 12px;font-size:11px;color:var(--color-text-primary);opacity:0;transition:opacity .3s;pointer-events:none;z-index:10;max-width:220px}
+#toast.show{opacity:1}
+</style>
+<div id="app">
+  <div id="tb">
+    <div id="bnd">
+      <div id="bico">LNV</div>
+      <div><div id="bnm">LISNAVE</div><div id="bsub">Sistema de Rastreamento de Garrafas de Gás</div></div>
+    </div>
+    <div id="sbar">
+      <div class="sc"><div class="sv" id="sv0">—</div><div class="sl">Total</div></div>
+      <div class="sc s1"><div class="sv" id="sv1">—</div><div class="sl">Ativas</div></div>
+      <div class="sc s2"><div class="sv" id="sv2">—</div><div class="sl">Recolha</div></div>
+      <div class="sc s3"><div class="sv" id="sv3">—</div><div class="sl">Recuperadas</div></div>
+    </div>
+    <div id="rtb"><div id="rdot"></div>TEMPO REAL</div>
+  </div>
+  <div id="bdy">
+    <div id="sb">
+      <div id="ssr"><input type="text" id="sin" placeholder="Pesquisar ID, tipo ou zona..." /></div>
+      <div id="sfil">
+        <button class="fch on" data-f="all">Todas</button>
+        <button class="fch" data-f="ativa">Ativas</button>
+        <button class="fch" data-f="recolha">Recolha</button>
+        <button class="fch" data-f="recuperada">Recuperadas</button>
+      </div>
+      <div id="szn"><select id="zsel"><option value="">Todas as zonas</option></select></div>
+      <div id="clist"></div>
+    </div>
+    <div id="mapcol">
+      <div id="mhdr">
+        <span id="mhtitle">MAPA DO ESTALEIRO — LISNAVE, SETÚBAL</span>
+        <div id="mleg">
+          <span class="ml"><span class="mld" style="background:#e24b4a"></span>Ativa</span>
+          <span class="ml"><span class="mld" style="background:#ef9f27"></span>Em Recolha</span>
+          <span class="ml"><span class="mld" style="background:#639922"></span>Recuperada</span>
+        </div>
+      </div>
+      <div id="mwrap">
+        <canvas id="cnv"></canvas>
+        <div id="toast"></div>
+      </div>
+      <div id="dp">
+        <div id="dph">
+          <span id="dpid"></span>
+          <span id="dptype"></span>
+          <span id="dpclose">×</span>
+        </div>
+        <div id="dpmeta"></div>
+        <div id="dpact"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const ZONES = [
+  {id:'DS1',name:'Doca Seca 1',x:.01,y:.01,w:.30,h:.54,type:'dock'},
+  {id:'DS2',name:'Doca Seca 2',x:.35,y:.01,w:.30,h:.54,type:'dock'},
+  {id:'DS3',name:'Doca Seca 3',x:.69,y:.01,w:.30,h:.54,type:'dock'},
+  {id:'OM',name:'Oficina Mecânica',x:.01,y:.60,w:.21,h:.17,type:'workshop'},
+  {id:'OE',name:'Oficina Elétrica',x:.25,y:.60,w:.21,h:.17,type:'workshop'},
+  {id:'AC',name:'Armazém Central',x:.49,y:.60,w:.20,h:.17,type:'storage'},
+  {id:'PIN',name:'Pintura Naval',x:.72,y:.60,w:.27,h:.17,type:'paint'},
+  {id:'CAIS',name:'Cais Principal',x:.01,y:.81,w:.98,h:.10,type:'quay'},
+];
+const typeColors={'Acetileno':'#ef9f27','Oxigénio':'#378add','Propano':'#e24b4a','CO₂':'#888780','Árgon':'#7f77dd'};
+const statusColors={ativa:'#e24b4a',recolha:'#ef9f27',recuperada:'#639922'};
+const statusLabels={ativa:'Ativa',recolha:'Em Recolha',recuperada:'Recuperada'};
+const TYPES=['Acetileno','Oxigénio','Propano','CO₂','Árgon'];
+const WORKERS=['J. Ferreira','M. Santos','R. Costa','A. Lopes','C. Mendes','P. Sousa'];
+function now(){return new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});}
+let cylinders=[
+  {id:'GAS-001',type:'Acetileno',zoneId:'DS1',cx:.08,cy:.14,status:'ativa',ts:'08:42',worker:'J. Ferreira',pres:145},
+  {id:'GAS-002',type:'Oxigénio',zoneId:'DS1',cx:.20,cy:.32,status:'recolha',ts:'09:05',worker:'M. Santos',pres:198},
+  {id:'GAS-003',type:'Propano',zoneId:'DS2',cx:.43,cy:.21,status:'ativa',ts:'09:12',worker:'R. Costa',pres:87},
+  {id:'GAS-004',type:'Acetileno',zoneId:'DS2',cx:.57,cy:.44,status:'recuperada',ts:'07:30',worker:'A. Lopes',pres:0},
+  {id:'GAS-005',type:'CO₂',zoneId:'DS3',cx:.75,cy:.14,status:'ativa',ts:'09:18',worker:'C. Mendes',pres:220},
+  {id:'GAS-006',type:'Árgon',zoneId:'DS3',cx:.88,cy:.39,status:'ativa',ts:'08:55',worker:'P. Sousa',pres:175},
+  {id:'GAS-007',type:'Oxigénio',zoneId:'OM',cx:.07,cy:.66,status:'recolha',ts:'09:20',worker:'J. Ferreira',pres:134},
+  {id:'GAS-008',type:'Acetileno',zoneId:'OE',cx:.31,cy:.67,status:'ativa',ts:'08:15',worker:'M. Santos',pres:156},
+  {id:'GAS-009',type:'Propano',zoneId:'AC',cx:.54,cy:.67,status:'recuperada',ts:'07:45',worker:'R. Costa',pres:0},
+  {id:'GAS-010',type:'CO₂',zoneId:'PIN',cx:.78,cy:.67,status:'ativa',ts:'09:25',worker:'A. Lopes',pres:201},
+  {id:'GAS-011',type:'Árgon',zoneId:'CAIS',cx:.16,cy:.85,status:'recolha',ts:'09:30',worker:'C. Mendes',pres:88},
+  {id:'GAS-012',type:'Acetileno',zoneId:'DS1',cx:.23,cy:.11,status:'ativa',ts:'08:50',worker:'P. Sousa',pres:167},
+  {id:'GAS-013',type:'Oxigénio',zoneId:'DS2',cx:.37,cy:.49,status:'ativa',ts:'09:08',worker:'J. Ferreira',pres:192},
+  {id:'GAS-014',type:'Propano',zoneId:'DS3',cx:.83,cy:.27,status:'recuperada',ts:'08:00',worker:'M. Santos',pres:0},
+  {id:'GAS-015',type:'CO₂',zoneId:'OM',cx:.13,cy:.71,status:'ativa',ts:'09:15',worker:'R. Costa',pres:210},
+  {id:'GAS-016',type:'Árgon',zoneId:'OE',cx:.29,cy:.72,status:'ativa',ts:'08:30',worker:'A. Lopes',pres:178},
+  {id:'GAS-017',type:'Acetileno',zoneId:'AC',cx:.60,cy:.70,status:'recolha',ts:'09:35',worker:'C. Mendes',pres:120},
+  {id:'GAS-018',type:'Oxigénio',zoneId:'PIN',cx:.82,cy:.66,status:'ativa',ts:'09:00',worker:'P. Sousa',pres:188},
+  {id:'GAS-019',type:'Propano',zoneId:'CAIS',cx:.37,cy:.84,status:'ativa',ts:'09:22',worker:'J. Ferreira',pres:95},
+  {id:'GAS-020',type:'CO₂',zoneId:'CAIS',cx:.65,cy:.85,status:'recuperada',ts:'08:10',worker:'M. Santos',pres:0},
+  {id:'GAS-021',type:'Acetileno',zoneId:'DS1',cx:.14,cy:.47,status:'ativa',ts:'09:28',worker:'R. Costa',pres:142},
+  {id:'GAS-022',type:'Árgon',zoneId:'DS2',cx:.49,cy:.34,status:'recolha',ts:'09:32',worker:'A. Lopes',pres:160},
+  {id:'GAS-023',type:'Oxigénio',zoneId:'DS3',cx:.72,cy:.51,status:'ativa',ts:'09:10',worker:'C. Mendes',pres:205},
+  {id:'GAS-024',type:'Propano',zoneId:'PIN',cx:.90,cy:.69,status:'recuperada',ts:'07:55',worker:'P. Sousa',pres:0},
+];
+let selectedId=null,filterStatus='all',filterZone='',searchText='';
+const zsel=document.getElementById('zsel');
+ZONES.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.name;zsel.appendChild(o);});
+function getFiltered(){
+  return cylinders.filter(c=>{
+    if(filterStatus!=='all'&&c.status!==filterStatus)return false;
+    if(filterZone&&c.zoneId!==filterZone)return false;
+    if(searchText){
+      const q=searchText.toLowerCase();
+      const zn=ZONES.find(z=>z.id===c.zoneId);
+      if(!c.id.toLowerCase().includes(q)&&!c.type.toLowerCase().includes(q)&&!(zn&&zn.name.toLowerCase().includes(q)))return false;
+    }
+    return true;
+  });
+}
+function updateStats(){
+  document.getElementById('sv0').textContent=cylinders.length;
+  document.getElementById('sv1').textContent=cylinders.filter(c=>c.status==='ativa').length;
+  document.getElementById('sv2').textContent=cylinders.filter(c=>c.status==='recolha').length;
+  document.getElementById('sv3').textContent=cylinders.filter(c=>c.status==='recuperada').length;
+}
+function renderList(){
+  const list=document.getElementById('clist');
+  const filtered=getFiltered();
+  if(!filtered.length){list.innerHTML='<div id="nores">Nenhuma garrafa encontrada</div>';return;}
+  list.innerHTML=filtered.map(c=>{
+    const zn=ZONES.find(z=>z.id===c.zoneId);
+    return `<div class="ci${c.id===selectedId?' sel':''}" data-id="${c.id}">
+      <div class="cd" style="background:${statusColors[c.status]}"></div>
+      <div class="cinf"><div class="cid">${c.id}</div><div class="csub">${c.type} · ${zn?zn.name:c.zoneId}</div></div>
+      <div class="cst ${c.status}">${statusLabels[c.status]}</div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.ci').forEach(el=>el.addEventListener('click',()=>selectCylinder(el.dataset.id)));
+}
+function renderDetail(){
+  const dp=document.getElementById('dp');
+  if(!selectedId){dp.classList.remove('vis');return;}
+  const c=cylinders.find(x=>x.id===selectedId);
+  if(!c){dp.classList.remove('vis');return;}
+  const zn=ZONES.find(z=>z.id===c.zoneId);
+  dp.classList.add('vis');
+  document.getElementById('dpid').textContent=c.id;
+  document.getElementById('dptype').textContent='· '+c.type;
+  document.getElementById('dpmeta').innerHTML=`
+    <div class="dm"><div class="dml">Zona</div><div class="dmv">${zn?zn.name:c.zoneId}</div></div>
+    <div class="dm"><div class="dml">Estado</div><div class="dmv" style="color:${statusColors[c.status]}">${statusLabels[c.status]}</div></div>
+    <div class="dm"><div class="dml">Pressão</div><div class="dmv">${c.pres>0?c.pres+' bar':'—'}</div></div>
+    <div class="dm"><div class="dml">Operador</div><div class="dmv">${c.worker}</div></div>`;
+  const acts=[];
+  if(c.status==='ativa')acts.push(`<button class="dab w" onclick="window.setStatus('${c.id}','recolha')">Marcar em Recolha</button>`);
+  if(c.status==='recolha')acts.push(`<button class="dab s" onclick="window.setStatus('${c.id}','recuperada')">Marcar Recuperada</button>`);
+  if(c.status==='recuperada')acts.push(`<button class="dab r" onclick="window.setStatus('${c.id}','ativa')">Recolocar em Serviço</button>`);
+  acts.push(`<button class="dab" onclick="sendPrompt('Como registar inspeção de segurança da garrafa ${c.id} (${c.type}) localizada na ${zn?zn.name:c.zoneId}? Que procedimentos devo seguir?')">Procedimentos de Segurança ↗</button>`);
+  document.getElementById('dpact').innerHTML=acts.join('');
+  setTimeout(drawMap,50);
+}
+function selectCylinder(id){
+  selectedId=selectedId===id?null:id;
+  renderList();renderDetail();drawMap();
+}
+window.setStatus=function(id,status){
+  const c=cylinders.find(x=>x.id===id);
+  if(c){c.status=status;c.ts=now();if(status==='recuperada')c.pres=0;}
+  updateStats();renderList();renderDetail();drawMap();
+  showToast(`${id} → ${statusLabels[status]}`);
+};
+window.selectCylinder=selectCylinder;
+function drawMap(){
+  const canvas=document.getElementById('cnv');
+  const wrap=document.getElementById('mwrap');
+  const W=wrap.offsetWidth,H=wrap.offsetHeight;
+  if(!W||!H)return;
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const zc={
+    dock:{bg:isDark?'#0d1f36':'#b8d0e6'},
+    workshop:{bg:isDark?'#151f15':'#c5d5c0'},
+    storage:{bg:isDark?'#201808':'#e0d8c0'},
+    paint:{bg:isDark?'#180e2a':'#d8d0ea'},
+    quay:{bg:isDark?'#0a1820':'#9abcce'},
+  };
+  ctx.fillStyle=isDark?'#111a24':'#ccc4b4';
+  ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=isDark?'#080e18':'#b0ccd8';
+  ctx.fillRect(0,.93*H,W,.07*H);
+  ZONES.forEach(z=>{
+    const x=z.x*W,y=z.y*H,w=z.w*W,h=z.h*H;
+    const c=zc[z.type]||zc.workshop;
+    ctx.fillStyle=c.bg;
+    ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle=isDark?'rgba(255,255,255,.1)':'rgba(0,0,0,.12)';
+    ctx.lineWidth=1;
+    ctx.strokeRect(x,y,w,h);
+    if(z.type==='dock'){
+      ctx.fillStyle=isDark?'rgba(255,255,255,.12)':'rgba(50,80,120,.18)';
+      const sw=w*.55,sh=h*.62,sx=x+w*.225,sy=y+h*.19;
+      ctx.beginPath();
+      ctx.roundRect(sx,sy,sw,sh,4);
+      ctx.fill();
+    }
+    ctx.font=`500 9px var(--font-sans,sans-serif)`;
+    ctx.fillStyle=isDark?'rgba(255,255,255,.28)':'rgba(0,0,0,.28)';
+    ctx.textAlign='center';
+    ctx.fillText(z.name.toUpperCase(),x+w/2,y+11);
+    ctx.textAlign='left';
+  });
+  const north_x=W*.96,north_y=H*.06;
+  ctx.font=`500 9px monospace`;
+  ctx.fillStyle=isDark?'rgba(255,255,255,.3)':'rgba(0,0,0,.25)';
+  ctx.textAlign='center';
+  ctx.fillText('N',north_x,north_y+3);
+  ctx.beginPath();ctx.moveTo(north_x,north_y-8);ctx.lineTo(north_x,north_y-18);
+  ctx.strokeStyle=isDark?'rgba(255,255,255,.25)':'rgba(0,0,0,.2)';
+  ctx.lineWidth=1.5;ctx.stroke();
+  ctx.textAlign='left';
+  const filtered=getFiltered();
+  const filteredIds=new Set(filtered.map(c=>c.id));
+  cylinders.forEach(c=>{
+    const isF=filteredIds.has(c.id),isSel=c.id===selectedId;
+    const px=c.cx*W,py=c.cy*H;
+    ctx.globalAlpha=isF?1:.15;
+    const R=isSel?11:7;
+    const IR=isSel?6.5:4;
+    ctx.beginPath();ctx.arc(px,py,R,0,Math.PI*2);
+    ctx.fillStyle=statusColors[c.status];ctx.fill();
+    ctx.beginPath();ctx.arc(px,py,IR,0,Math.PI*2);
+    ctx.fillStyle=typeColors[c.type]||'#888';ctx.fill();
+    ctx.beginPath();ctx.arc(px,py,isSel?2.5:1.5,0,Math.PI*2);
+    ctx.fillStyle=isDark?'#111':'#fff';ctx.fill();
+    if(isSel){
+      ctx.globalAlpha=1;
+      const lbl=c.id;
+      const lx=px+14,ly=py+4;
+      ctx.font=`500 10px var(--font-mono,monospace)`;
+      const tw=ctx.measureText(lbl).width;
+      ctx.fillStyle=isDark?'rgba(0,0,0,.7)':'rgba(255,255,255,.85)';
+      ctx.fillRect(lx-2,ly-10,tw+6,13);
+      ctx.fillStyle=isDark?'#fff':'#000';
+      ctx.fillText(lbl,lx+1,ly);
+    }
+    ctx.globalAlpha=1;
+  });
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+document.getElementById('sin').addEventListener('input',e=>{searchText=e.target.value;renderList();drawMap();});
+document.querySelectorAll('.fch').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.fch').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');filterStatus=btn.dataset.f;renderList();drawMap();
+  });
+});
+zsel.addEventListener('change',e=>{filterZone=e.target.value;renderList();drawMap();});
+document.getElementById('dpclose').addEventListener('click',()=>{selectedId=null;renderList();renderDetail();drawMap();});
+const cnv=document.getElementById('cnv');
+cnv.addEventListener('click',e=>{
+  const rect=cnv.getBoundingClientRect();
+  const scX=cnv.width/rect.width,scY=cnv.height/rect.height;
+  const mx=(e.clientX-rect.left)*scX,my=(e.clientY-rect.top)*scY;
+  const W=cnv.width,H=cnv.height;
+  let closest=null,minD=14;
+  getFiltered().forEach(c=>{
+    const d=Math.sqrt((c.cx*W-mx)**2+(c.cy*H-my)**2);
+    if(d<minD){minD=d;closest=c;}
+  });
+  selectCylinder(closest?closest.id:null);
+});
+cnv.addEventListener('mousemove',e=>{
+  const rect=cnv.getBoundingClientRect();
+  const scX=cnv.width/rect.width,scY=cnv.height/rect.height;
+  const mx=(e.clientX-rect.left)*scX,my=(e.clientY-rect.top)*scY;
+  const W=cnv.width,H=cnv.height;
+  const near=getFiltered().some(c=>Math.sqrt((c.cx*W-mx)**2+(c.cy*H-my)**2)<12);
+  cnv.style.cursor=near?'pointer':'default';
+});
+let nextId=cylinders.length+1;
+setInterval(()=>{
+  const r=Math.random();
+  if(r<.18&&nextId<=34){
+    const z=ZONES[Math.floor(Math.random()*(ZONES.length-1))];
+    const nid=`GAS-${String(nextId).padStart(3,'0')}`;
+    cylinders.push({id:nid,type:TYPES[Math.floor(Math.random()*TYPES.length)],zoneId:z.id,
+      cx:z.x+z.w*.15+Math.random()*z.w*.7,cy:z.y+z.h*.15+Math.random()*z.h*.65,
+      status:'ativa',ts:now(),worker:WORKERS[Math.floor(Math.random()*WORKERS.length)],
+      pres:Math.floor(Math.random()*180)+50});
+    showToast(`Nova garrafa detectada: ${nid}`);nextId++;
+  } else if(r<.5){
+    const activas=cylinders.filter(c=>c.status==='ativa');
+    if(activas.length){
+      const c=activas[Math.floor(Math.random()*activas.length)];
+      c.status='recolha';c.ts=now();
+      showToast(`${c.id} em processo de recolha`);
+    }
+  } else {
+    const c=cylinders[Math.floor(Math.random()*cylinders.length)];
+    if(c.status!=='recuperada'){
+      c.cx=Math.max(.02,Math.min(.98,c.cx+(Math.random()-.5)*.025));
+      c.cy=Math.max(.02,Math.min(.92,c.cy+(Math.random()-.5)*.025));
+    }
+  }
+  updateStats();renderList();if(selectedId)renderDetail();drawMap();
+},9000);
+const ro=new ResizeObserver(()=>drawMap());
+ro.observe(document.getElementById('mwrap'));
+updateStats();renderList();renderDetail();
+setTimeout(drawMap,120);
+</script>
