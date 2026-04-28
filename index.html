@@ -958,14 +958,7 @@ window.exportData=function(){const blob=new Blob([JSON.stringify({cylinders,work
 window.importData=function(){const file=document.getElementById('import-file').files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);cylinders=data.cylinders;workers=data.workers;saveData();updateStats();renderList();updateMapMarkers();closeModal();}catch{alert('Ficheiro inválido');}};reader.readAsText(file);};
 
 function initMap(){
-  map=L.map('map',{
-    zoomControl:true,
-    attributionControl:true,
-    minZoom:14,
-    maxZoom:19,
-    maxBounds: LISNAVE_BOUNDS,
-    maxBoundsViscosity: 1.0
-  }).setView([38.4777,-8.7934],17);
+  map=L.map('map',{zoomControl:true,attributionControl:true,minZoom:14,maxZoom:19}).setView([38.4777,-8.7934],17);
   satelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
     maxZoom:19,
     maxNativeZoom:19,
