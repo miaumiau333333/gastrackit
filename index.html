@@ -322,6 +322,7 @@ body{display:flex;flex-direction:column;padding:0}
 }
 
 body.mobile-list-collapsed #sb { display: none; }
+
 </style>
 </head>
 <body>
@@ -354,7 +355,7 @@ body.mobile-list-collapsed #sb { display: none; }
     </div>
     <button id="cfg-btn" onclick="openModal()">⚙️ Configurar</button>
     <div id="rtb"><div id="rdot"></div>TEMPO REAL</div>
-    <img src="Logotipo_Lisnave.png" alt="Logo" class="logo-tb">
+    <img src="Logotipo_Lisnave.png" alt="Logo Lisnave" class="logo-tb" onerror="this.style.display='none'">
   </div>
   <div id="bdy">
     <div id="sb">
@@ -371,6 +372,7 @@ body.mobile-list-collapsed #sb { display: none; }
     <div id="mapcol">
       <div id="map"></div>
       <div id="map-toolbar">
+        <button class="map-btn mobile-only" id="btn-toggle-list" onclick="toggleMobileList()">📋 Esconder Lista</button>
         <button class="map-btn" id="btn-add-lost" onclick="toggleAddMode()">➕ Adicionar no Mapa</button>
       </div>
 
@@ -420,6 +422,91 @@ body.mobile-list-collapsed #sb { display: none; }
       <div class="mtab" onclick="switchTab('dados')">Dados</div>
     </div>
     <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<!-- ADD ON MAP MODAL -->
+<div id="add-overlay" class="overlay">
+  <div class="modal-box" style="width:500px">
+    <div class="modal-hdr blue"><span class="modal-title">📍 Nova Garrafa no Mapa</span><span class="modal-close" onclick="cancelAdd()">✕</span></div>
+    <div class="modal-body">
+      <div class="info-box">Preenche os dados da garrafa que será posicionada no local clicado.</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">ID</label><input class="form-input" id="am-id" placeholder="GAS-025"/></div>
+        <div class="form-group"><label class="form-label">Tipo de Gás</label>
+          <select class="form-select" id="am-type" onchange="toggleCustom('am')">
+            <option>Acetileno</option><option>Oxigénio</option><option>Propano</option><option>CO₂</option><option>Árgon</option>
+            <option value="__custom__">Personalizado...</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="am-cg" style="display:none">
+        <label class="form-label">Nome do Gás</label>
+        <input class="form-input" id="am-ct" placeholder="Ex: Hélio, Azoto, Metano..."/>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Zona</label><select class="form-select" id="am-zone"></select></div>
+        <div class="form-group"><label class="form-label">Operador</label><select class="form-select" id="am-worker"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Estado</label>
+          <select class="form-select" id="am-status">
+            <option value="ativa">Ativa</option><option value="recolha">Em Recolha</option><option value="recuperada">Recuperada</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Pressão (bar)</label><input class="form-input" id="am-pres" type="number" min="0" max="300" placeholder="150"/></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">📅 Data de Introdução</label>
+        <input class="form-input" id="am-ts" type="date"/>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="cancelAdd()">Cancelar</button>
+        <button class="btn btn-blue" onclick="confirmAdd()">✔ Adicionar Garrafa</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-overlay" class="overlay">
+  <div class="modal-box" style="width:500px">
+    <div class="modal-hdr purple"><span class="modal-title" id="edit-title">✏️ Editar Garrafa</span><span class="modal-close" onclick="closeEdit()">✕</span></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">ID</label><input class="form-input" id="em-id" disabled style="opacity:.5;cursor:not-allowed"/></div>
+        <div class="form-group"><label class="form-label">Tipo de Gás</label>
+          <select class="form-select" id="em-type" onchange="toggleCustom('em')">
+            <option>Acetileno</option><option>Oxigénio</option><option>Propano</option><option>CO₂</option><option>Árgon</option>
+            <option value="__custom__">Personalizado...</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="em-cg" style="display:none">
+        <label class="form-label">Nome do Gás</label>
+        <input class="form-input" id="em-ct" placeholder="Ex: Hélio, Azoto, Metano..."/>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Zona</label><select class="form-select" id="em-zone"></select></div>
+        <div class="form-group"><label class="form-label">Operador</label><select class="form-select" id="em-worker"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Estado</label>
+          <select class="form-select" id="em-status">
+            <option value="ativa">Ativa</option><option value="recolha">Em Recolha</option><option value="recuperada">Recuperada</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Pressão (bar)</label><input class="form-input" id="em-pres" type="number" min="0" max="300"/></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">📅 Data de Introdução</label>
+        <input class="form-input" id="em-ts" type="date"/>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="closeEdit()">Cancelar</button>
+        <button class="btn btn-purple" onclick="saveEdit()">💾 Guardar Alterações</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -490,10 +577,6 @@ function safeLoadData() {
       };
     }
     
-    if (validCylinders.length !== data.cylinders.length) {
-      console.warn(`Removidos ${data.cylinders.length - validCylinders.length} cilindros inválidos`);
-    }
-    
     return {
       cylinders: validCylinders,
       workers: data.workers || [...DEFAULT_WORKERS]
@@ -510,7 +593,7 @@ function safeLoadData() {
 
 const data = safeLoadData();
 let cylinders = data.cylinders;
-let workers = data.workers;
+let workers   = data.workers;
 let selectedId=null, filterStatus='all', filterZone='', searchText='';
 let addingMode=false, pendingLat=null, pendingLng=null;
 let bottleMarkers=new Map(), editingId=null;
@@ -525,6 +608,10 @@ const zsel=document.getElementById('zsel');
 DEFAULT_ZONES.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.name;zsel.appendChild(o);});
 
 function now(){return new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric'});}
+// Convert ISO date string (YYYY-MM-DD from <input type="date">) to display format dd/mm/aaaa
+function isoToDisplay(iso){if(!iso)return now();const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
+// Convert display format dd/mm/aaaa to ISO YYYY-MM-DD for <input type="date">
+function displayToIso(disp){if(!disp)return new Date().toISOString().slice(0,10);const parts=disp.split('/');if(parts.length===3)return`${parts[2]}-${parts[1]}-${parts[0]}`;return new Date().toISOString().slice(0,10);}
 function saveData(){localStorage.setItem('lisnave_data',JSON.stringify({cylinders,workers}));}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3000);}
 
@@ -619,44 +706,25 @@ window.deleteCylinder=function(id){
   saveData();updateStats();renderList();renderDetail();updateMapMarkers();showToast(`${id} removida`);
 };
 
-// ── EVENTS ──
-document.getElementById('sin').addEventListener('input',e=>{searchText=e.target.value;renderList();updateMapMarkers();});
-document.querySelectorAll('.fch').forEach(btn=>btn.addEventListener('click',()=>filterBy(btn.dataset.f)));
-zsel.addEventListener('change',e=>{filterZone=e.target.value;renderList();updateMapMarkers();});
-document.getElementById('dpclose').addEventListener('click',()=>{selectedId=null;renderList();renderDetail();updateMapMarkers();});
-document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
-
-// ── CONFIG MODAL ──
-let currentTab='garrafas';
-function openModal(){document.getElementById('modal-overlay').classList.add('open');switchTab('garrafas');}
-function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
-function switchTab(tab){currentTab=tab;document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',['garrafas','operadores','dados'][i]===tab));renderModalBody();}
-
-function renderModalBody(){
-  const body=document.getElementById('modal-body');
-  if(currentTab==='garrafas'){
-    body.innerHTML=`<div class="info-box">Garrafas existentes (${cylinders.length})</div>
-      <div class="cfg-list">${cylinders.map(c=>{
-        const zn=DEFAULT_ZONES.find(z=>z.id===c.zoneId);
-        return`<div class="cfg-item">
-          <div style="flex:1"><div class="cfg-item-label">${c.id}</div>
-          <div class="cfg-item-sub">${c.type} · ${zn?zn.name:c.zoneId} · <span style="color:${STATUS_COLORS[c.status]}">${STATUS_LABELS[c.status]}</span>${c.ts?` · 📅 ${c.ts}`:''}</div></div>
-          <div class="cfg-item-actions">
-            <button class="cfg-action-btn del" onclick="if(confirm('Remover ${c.id}?')){cylinders=cylinders.filter(x=>x.id!==c.id);saveData();updateStats();renderList();updateMapMarkers();renderModalBody();showToast('${c.id} removida');}">🗑</button>
-          </div>
-        </div>`;
-      }).join('')}</div>`;
-  } else if(currentTab==='operadores'){
-    body.innerHTML=`<div class="info-box">Operadores disponíveis</div>
-      <div class="cfg-list">${workers.map((w,i)=>`<div class="cfg-item"><div class="cfg-item-label" style="flex:1">👤 ${w}</div></div>`).join('')}</div>`;
-  } else {
-    body.innerHTML=`<div class="info-box">Exporta, importa ou repõe os dados da aplicação.</div>
-      <button class="btn btn-orange" style="margin-bottom:10px;width:100%" onclick="exportData()">⬇ Exportar JSON</button>
-      <button class="btn btn-danger" style="width:100%" onclick="if(confirm('Repor todos os dados originais?')){localStorage.removeItem('lisnave_data');location.reload();}">⚠ Repor Dados de Fábrica</button>`;
-  }
+// ── CUSTOM GAS TYPE ──
+function toggleCustom(p){
+  const sel=document.getElementById(p+'-type');
+  document.getElementById(p+'-cg').style.display=sel.value==='__custom__'?'block':'none';
 }
-
-window.exportData=function(){const blob=new Blob([JSON.stringify({cylinders,workers},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lisnave_${new Date().toISOString().slice(0,10)}.json`;a.click();};
+function getType(p){
+  const v=document.getElementById(p+'-type').value;
+  if(v==='__custom__'){const t=document.getElementById(p+'-ct').value.trim();return t||'Personalizado';}
+  return v;
+}
+function setType(p,type){
+  const sel=document.getElementById(p+'-type');
+  if(BASE_TYPES.includes(type)){sel.value=type;document.getElementById(p+'-cg').style.display='none';}
+  else{sel.value='__custom__';document.getElementById(p+'-cg').style.display='block';document.getElementById(p+'-ct').value=type;}
+}
+function fillSelects(p){
+  document.getElementById(p+'-zone').innerHTML=DEFAULT_ZONES.map(z=>`<option value="${z.id}">${z.name}</option>`).join('');
+  document.getElementById(p+'-worker').innerHTML=workers.map(w=>`<option>${w}</option>`).join('');
+}
 
 // ── ADD ON MAP ──
 function toggleAddMode(){
@@ -666,22 +734,26 @@ function toggleAddMode(){
   const fab=document.getElementById('fab-add-btn');
   if(fab){fab.classList.toggle('active',addingMode);fab.textContent=addingMode?'✕':'➕';}
   if(addingMode){
+    // On mobile with GPS: offer to add at current location
+    if(window.innerWidth<=900&&userMarker){
+      if(confirm('📍 Adicionar garrafa na tua localização GPS atual?\n\nOK = Usar localização atual\nCancelar = Clicar no mapa')){
+        const ll=userMarker.getLatLng();
+        openAddModal(ll.lat,ll.lng);
+        return;
+      }
+    }
     showToast('🗺️ Clica no mapa para posicionar a garrafa',4000);
   } else {
     showToast('❌ Modo adição cancelado');
+    if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
   }
 }
-
-function cancelAdd(){
-  document.getElementById('add-overlay').classList.remove('open');
-  pendingLat=null;pendingLng=null;addingMode=false;
-  document.getElementById('btn-add-lost')?.classList.remove('active');
-  // 🔧 CORREÇÃO: Atualizar FAB button do mobile para voltar ao ➕
-  const fab=document.getElementById('fab-add-btn');
-  if(fab){
-    fab.classList.remove('active');
-    fab.textContent='➕';
-  }
+function toggleMobileList(){
+  if(window.innerWidth>900)return;
+  const collapsed=document.body.classList.toggle('mobile-list-collapsed');
+  const btn=document.getElementById('btn-toggle-list');
+  if(btn)btn.textContent=collapsed?'📋 Mostrar Lista':'📋 Esconder Lista';
+  setTimeout(()=>{if(map)map.invalidateSize();},120);
 }
 
 // Mobile bottom sheet
@@ -719,6 +791,19 @@ function renderMobileList(){
   }));
 }
 
+// Swipe-down to close sheet
+(()=>{
+  let startY=0;
+  const sheet=document.getElementById('sb-sheet');
+  if(!sheet)return;
+  sheet.addEventListener('touchstart',e=>{startY=e.touches[0].clientY;},{passive:true});
+  sheet.addEventListener('touchmove',e=>{
+    const dy=e.touches[0].clientY-startY;
+    const listEl=document.getElementById('mobile-clist');
+    if(dy>60&&(!listEl||listEl.scrollTop<=0))closeMobileSheet();
+  },{passive:true});
+})();
+
 // Center on user location
 function centerOnUser(){
   if(userMarker){
@@ -728,92 +813,258 @@ function centerOnUser(){
     showToast('⚠️ GPS ainda não disponível');
   }
 }
-
 function openAddModal(lat,lng){
   pendingLat=lat;pendingLng=lng;
+  fillSelects('am');
   const suggestedId=`GAS-${String(cylinders.length+1).padStart(3,'0')}`;
-  // Simplificado - sem modal complexo para teste rápido
-  const type='Acetileno';
-  const zoneId='DS1';
+  document.getElementById('am-id').value=suggestedId;
+  document.getElementById('am-type').value='Acetileno';
+  document.getElementById('am-cg').style.display='none';
+  document.getElementById('am-ct').value='';
+  document.getElementById('am-status').value='ativa';
+  document.getElementById('am-pres').value='150';
+  document.getElementById('am-ts').value=new Date().toISOString().slice(0,10);
+  document.getElementById('add-overlay').classList.add('open');
+}
+function cancelAdd(){
+  document.getElementById('add-overlay').classList.remove('open');
+  pendingLat=null;pendingLng=null;addingMode=false;
+  document.getElementById('btn-add-lost').classList.remove('active');
+  // 🔧 CORREÇÃO: Atualizar FAB button do mobile para voltar ao ➕
+  const fab=document.getElementById('fab-add-btn');
+  if(fab){
+    fab.classList.remove('active');
+    fab.textContent='➕';
+  }
+}
+window.confirmAdd=function(){
+  const id=document.getElementById('am-id').value.trim();
+  if(!id){alert('Introduz um ID.');return;}
+  if(cylinders.find(c=>c.id===id)){alert(`ID "${id}" já existe.`);return;}
+  const type=getType('am');
+  const zoneId=document.getElementById('am-zone').value;
   const zone=DEFAULT_ZONES.find(z=>z.id===zoneId);
-  cylinders.push({id:suggestedId,type,zoneId,lat:pendingLat,lng:pendingLng,status:'ativa',ts:now(),worker:'J. Ferreira',pres:150});
+  cylinders.push({id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0});
   saveData();updateStats();renderList();updateMapMarkers();
-  cancelAdd();showToast(`✅ ${suggestedId} adicionada`);
+  cancelAdd();showToast(`✅ ${id} adicionada`);
+};
+
+// ── EDIT ──
+function openEdit(id){
+  editingId=id;
+  const c=cylinders.find(x=>x.id===id);if(!c)return;
+  fillSelects('em');
+  document.getElementById('em-id').value=c.id;
+  setType('em',c.type);
+  document.getElementById('em-zone').value=c.zoneId;
+  document.getElementById('em-worker').value=c.worker;
+  document.getElementById('em-status').value=c.status;
+  document.getElementById('em-pres').value=c.pres;
+  document.getElementById('em-ts').value=displayToIso(c.ts);
+  document.getElementById('edit-title').textContent=`✏️ Editar — ${c.id}`;
+  document.getElementById('edit-overlay').classList.add('open');
+}
+function closeEdit(){document.getElementById('edit-overlay').classList.remove('open');editingId=null;}
+window.saveEdit=function(){
+  const c=cylinders.find(x=>x.id===editingId);if(!c)return;
+  c.type=getType('em');
+  c.zoneId=document.getElementById('em-zone').value;
+  c.worker=document.getElementById('em-worker').value;
+  c.status=document.getElementById('em-status').value;
+  c.pres=parseInt(document.getElementById('em-pres').value)||0;
+  const tsIso=document.getElementById('em-ts').value;
+  if(tsIso)c.ts=isoToDisplay(tsIso);
+  saveData();updateStats();renderList();renderDetail();updateMapMarkers();
+  closeEdit();showToast(`✅ ${c.id} atualizada`);
+};
+
+// ── EVENTS ──
+document.getElementById('sin').addEventListener('input',e=>{searchText=e.target.value;renderList();updateMapMarkers();});
+document.querySelectorAll('.fch').forEach(btn=>btn.addEventListener('click',()=>filterBy(btn.dataset.f)));
+zsel.addEventListener('change',e=>{filterZone=e.target.value;renderList();updateMapMarkers();});
+document.getElementById('dpclose').addEventListener('click',()=>{selectedId=null;renderList();renderDetail();updateMapMarkers();});
+document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
+document.getElementById('add-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('add-overlay'))cancelAdd();});
+document.getElementById('edit-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('edit-overlay'))closeEdit();});
+
+// ── CONFIG MODAL ──
+let currentTab='garrafas';
+function openModal(){document.getElementById('modal-overlay').classList.add('open');switchTab('garrafas');}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function switchTab(tab){currentTab=tab;document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',['garrafas','operadores','dados'][i]===tab));renderModalBody();}
+
+function renderModalBody(){
+  const body=document.getElementById('modal-body');
+  const typeOpts=BASE_TYPES.map(t=>`<option>${t}</option>`).join('')+'<option value="__custom__">Personalizado...</option>';
+  if(currentTab==='garrafas'){
+    body.innerHTML=`<div class="info-box">Adiciona novas garrafas ou edita/remove as existentes. Podes também adicionar diretamente no mapa com o botão "➕ Adicionar no Mapa".</div>
+      <div class="section-title">Adicionar Garrafa</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">ID</label><input class="form-input" id="new-id" placeholder="GAS-013"/></div>
+        <div class="form-group"><label class="form-label">Tipo de Gás</label><select class="form-select" id="new-type" onchange="toggleCustom('new')">${typeOpts}</select></div>
+      </div>
+      <div class="form-group" id="new-cg" style="display:none"><label class="form-label">Nome do Gás</label><input class="form-input" id="new-ct" placeholder="Ex: Hélio, Azoto..."/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Zona</label><select class="form-select" id="new-zone">${DEFAULT_ZONES.map(z=>`<option value="${z.id}">${z.name}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="form-label">Operador</label><select class="form-select" id="new-worker">${workers.map(w=>`<option>${w}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Estado</label><select class="form-select" id="new-status"><option value="ativa">Ativa</option><option value="recolha">Em Recolha</option><option value="recuperada">Recuperada</option></select></div>
+        <div class="form-group"><label class="form-label">Pressão (bar)</label><input class="form-input" id="new-pres" type="number" min="0" max="300" placeholder="150"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">📅 Data de Introdução</label><input class="form-input" id="new-ts" type="date" value="${new Date().toISOString().slice(0,10)}"/></div>
+      <div class="form-actions"><button class="btn btn-orange" onclick="addCylinder()">✚ Adicionar Garrafa</button></div>
+      <div class="section-title" style="margin-top:20px">Garrafas Existentes (${cylinders.length})</div>
+      <div class="cfg-list">${cylinders.map(c=>{
+        const zn=DEFAULT_ZONES.find(z=>z.id===c.zoneId);
+        return`<div class="cfg-item">
+          <div style="flex:1"><div class="cfg-item-label">${c.id}</div>
+          <div class="cfg-item-sub">${c.type} · ${zn?zn.name:c.zoneId} · <span style="color:${STATUS_COLORS[c.status]}">${STATUS_LABELS[c.status]}</span>${c.ts?` · 📅 ${c.ts}`:''}</div></div>
+          <div class="cfg-item-actions">
+            <button class="cfg-action-btn edit-cfg" onclick="closeModal();openEdit('${c.id}')">✏️ Editar</button>
+            <button class="cfg-action-btn del" onclick="removeCylFromModal('${c.id}')">🗑</button>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+  } else if(currentTab==='operadores'){
+    body.innerHTML=`<div class="info-box">Gere os operadores disponíveis para atribuição a garrafas.</div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;">
+        <input class="form-input" id="new-worker-name" placeholder="Nome do operador..." style="flex:1"/>
+        <button class="btn btn-orange" onclick="addWorker()" style="flex:0 0 auto;min-width:80px">✚</button>
+      </div>
+      <div class="cfg-list">${workers.map((w,i)=>`<div class="cfg-item"><div class="cfg-item-label" style="flex:1">👤 ${w}</div><button class="cfg-action-btn del" onclick="removeWorker(${i})">🗑</button></div>`).join('')}</div>`;
+  } else {
+    body.innerHTML=`<div class="info-box">Exporta, importa ou repõe os dados da aplicação.</div>
+      <button class="btn btn-orange" style="margin-bottom:10px;width:100%" onclick="exportData()">⬇ Exportar JSON</button>
+      <input type="file" id="import-file" accept=".json" style="margin-bottom:10px;width:100%;padding:10px;border:1px dashed #ddd;border-radius:8px;font-size:13px"/>
+      <button class="btn btn-orange" style="margin-bottom:20px;width:100%" onclick="importData()">⬆ Importar JSON</button>
+      <button class="btn btn-danger" style="width:100%" onclick="if(confirm('Repor todos os dados originais?')){localStorage.removeItem('lisnave_data');location.reload();}">⚠ Repor Dados de Fábrica</button>`;
+  }
 }
 
+window.addCylinder=function(){
+  const id=document.getElementById('new-id').value.trim();
+  if(!id||cylinders.find(c=>c.id===id)){alert('ID inválido ou já existe.');return;}
+  const type=getType('new');
+  const z=DEFAULT_ZONES.find(z=>z.id===document.getElementById('new-zone').value);
+  const tsIso=document.getElementById('new-ts')?.value;
+  cylinders.push({id,type,zoneId:z.id,lat:z.lat,lng:z.lng,status:document.getElementById('new-status').value,ts:tsIso?isoToDisplay(tsIso):now(),worker:document.getElementById('new-worker').value,pres:parseInt(document.getElementById('new-pres').value)||0});
+  saveData();updateStats();renderList();updateMapMarkers();renderModalBody();showToast(`✅ ${id} adicionada`);
+};
+window.removeCylFromModal=function(id){if(!confirm(`Remover ${id}?`))return;cylinders=cylinders.filter(c=>c.id!==id);saveData();updateStats();renderList();updateMapMarkers();renderModalBody();};
+window.addWorker=function(){const name=document.getElementById('new-worker-name').value.trim();if(!name||workers.includes(name))return;workers.push(name);saveData();renderModalBody();};
+window.removeWorker=function(i){if(!confirm(`Remover ${workers[i]}?`))return;workers.splice(i,1);saveData();renderModalBody();};
+window.exportData=function(){const blob=new Blob([JSON.stringify({cylinders,workers},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lisnave_${new Date().toISOString().slice(0,10)}.json`;a.click();};
+window.importData=function(){const file=document.getElementById('import-file').files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);cylinders=data.cylinders;workers=data.workers;saveData();updateStats();renderList();updateMapMarkers();closeModal();}catch{alert('Ficheiro inválido');}};reader.readAsText(file);};
+
 function initMap(){
-  console.log('Iniciando mapa...');
-  
-  // Verificar se o elemento do mapa existe
-  const mapContainer = document.getElementById('map');
-  if (!mapContainer) {
-    console.error('Elemento do mapa não encontrado');
-    showToast('❌ Erro: elemento do mapa não encontrado');
-    return;
-  }
-  
-  try {
-    map=L.map('map',{zoomControl:true,attributionControl:true,minZoom:14,maxZoom:19}).setView([38.4777,-8.7934],17);
-    console.log('Mapa criado com sucesso');
-    
-    satelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-      maxZoom:19,
-      maxNativeZoom:19,
-      noWrap:true,
-      attribution:'Tiles &copy; Esri'
-    });
-    
-    offlineOverlay=L.imageOverlay('lisnave_sat_offline.png',LISNAVE_BOUNDS,{opacity:1,interactive:false});
-    
-    const applyBaseLayer=(isOnline)=>{
-      const useOffline=!isOnline;
-      if(map.hasLayer(satelliteLayer))map.removeLayer(satelliteLayer);
-      if(map.hasLayer(offlineOverlay))map.removeLayer(offlineOverlay);
-      if(useOffline){
-        map.setMinZoom(14);map.setMaxZoom(22);
-        offlineOverlay.addTo(map);
-        if(!usingOfflineBase)showToast('📴 Modo offline: imagem satélite estática');
-      }else{
-        map.setMinZoom(14);map.setMaxZoom(19);
-        satelliteLayer.addTo(map);
-        if(usingOfflineBase)showToast('🌐 Modo online: satélite em tempo real');
+  map=L.map('map',{
+    zoomControl:true,
+    attributionControl:true,
+    minZoom:14,
+    maxZoom:19,
+    maxBounds: LISNAVE_BOUNDS,
+    maxBoundsViscosity: 1.0
+  }).setView([38.4777,-8.7934],17);
+  satelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+    maxZoom:19,
+    maxNativeZoom:19,
+    noWrap:true,
+    attribution:'Tiles &copy; Esri'
+  });
+  offlineOverlay=L.imageOverlay('lisnave_sat_offline.png',LISNAVE_BOUNDS,{opacity:1,interactive:false});
+  const applyBaseLayer=(isOnline)=>{
+    const useOffline=!isOnline;
+    if(map.hasLayer(satelliteLayer))map.removeLayer(satelliteLayer);
+    if(map.hasLayer(offlineOverlay))map.removeLayer(offlineOverlay);
+    if(useOffline){
+      map.setMinZoom(14);
+      map.setMaxZoom(22);
+      offlineOverlay.addTo(map);
+      if(!usingOfflineBase)showToast('📴 Modo offline: imagem satélite estática');
+    }else{
+      map.setMinZoom(14);
+      map.setMaxZoom(19);
+      satelliteLayer.addTo(map);
+      if(usingOfflineBase)showToast('🌐 Modo online: satélite em tempo real');
+    }
+    usingOfflineBase=useOffline;
+  };
+  applyBaseLayer(navigator.onLine);
+  window.addEventListener('online',()=>applyBaseLayer(true));
+  window.addEventListener('offline',()=>applyBaseLayer(false));
+  const btnToggleList=document.getElementById('btn-toggle-list');
+  if(btnToggleList){
+    const onResize=()=>{
+      if(window.innerWidth>900){
+        document.body.classList.remove('mobile-list-collapsed');
+        btnToggleList.textContent='📋 Esconder Lista';
       }
-      usingOfflineBase=useOffline;
+      if(map)map.invalidateSize();
     };
-    
-    applyBaseLayer(navigator.onLine);
-    window.addEventListener('online',()=>applyBaseLayer(true));
-    window.addEventListener('offline',()=>applyBaseLayer(false));
-    
-    updateMapMarkers();
-    showToast('🗺️ Mapa carregado com sucesso');
-    
-  } catch (error) {
-    console.error('Erro ao inicializar mapa:', error);
-    showToast('❌ Erro ao carregar mapa: ' + error.message);
+    window.addEventListener('resize',onResize);
   }
+
+  if(navigator.geolocation){
+    console.log('GPS disponível, iniciando watchPosition...');
+    navigator.geolocation.watchPosition(pos=>{
+      const loc=[pos.coords.latitude,pos.coords.longitude];
+      console.log('GPS atualizado:', loc, 'accuracy:', pos.coords.accuracy);
+      
+      if(userMarker){
+        userMarker.setLatLng(loc);
+        if(userMarker._accCircle){
+          userMarker._accCircle.setLatLng(loc);
+          userMarker._accCircle.setRadius(pos.coords.accuracy||20);
+        }
+      } else {
+        // Blue pulsing dot
+        userMarker=L.circleMarker(loc,{
+          radius:9,color:'#ffffff',weight:3,
+          fillColor:'#4285F4',fillOpacity:1,interactive:false,
+        }).addTo(map);
+        // Accuracy ring
+        userMarker._accCircle=L.circle(loc,{
+          radius:pos.coords.accuracy||20,
+          color:'#4285F4',weight:1,
+          fillColor:'#4285F4',fillOpacity:0.1,interactive:false,
+        }).addTo(map);
+        // First GPS fix: center map
+        map.setView(loc,18);
+        showToast('📍 Localização GPS ativa',2500);
+      }
+    },
+    err=>{
+      console.error('Erro GPS:', err);
+      if(err.code===1)showToast('⚠️ Permissão GPS negada. Ativa nas definições do browser.',5000);
+      else if(err.code===2)showToast('⚠️ GPS indisponível neste local',3000);
+      else if(err.code===3)showToast('⚠️ Timeout GPS. Tentando novamente...',3000);
+      else showToast('⚠️ Erro desconhecido no GPS',3000);
+    },
+    {enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+  } else {
+    console.warn('GPS não disponível neste dispositivo');
+    showToast('⚠️ GPS não disponível neste dispositivo',3000);
+  }
+
+  map.on('click',e=>{
+    if(!addingMode)return;
+    openAddModal(e.latlng.lat,e.latlng.lng);
+  });
+
+  updateMapMarkers();
 }
 
 function updateMapMarkers(){
-  if(!map){
-    console.warn('Mapa não disponível para atualizar marcadores');
-    return;
-  }
-  
-  console.log(`Atualizando ${cylinders.length} marcadores...`);
-  
-  // Limpar marcadores existentes
+  if(!map)return;
   bottleMarkers.forEach(m=>map.removeLayer(m));
   bottleMarkers.clear();
-  
-  const filtered=getFiltered();
-  const filteredIds=new Set(filtered.map(c=>c.id));
-  
+  const filteredIds=new Set(getFiltered().map(c=>c.id));
   cylinders.forEach(cyl=>{
     const isF=filteredIds.has(cyl.id);
     const isSel=cyl.id===selectedId;
-    const radius=isSel?14:isF?8:5;
-    
+    const isMobile=window.innerWidth<=900;
+    const radius=isSel?14:isF?(isMobile?11:8):(isMobile?6:5);
     const marker=L.circleMarker([cyl.lat,cyl.lng],{
       radius,
       color:'#ffffff',
@@ -822,27 +1073,15 @@ function updateMapMarkers(){
       fillOpacity:isF?0.95:0.3,
       opacity:isF?1:0.35
     }).addTo(map);
-    
     const zn=DEFAULT_ZONES.find(z=>z.id===cyl.zoneId);
     marker.bindPopup(`<div style="font-family:sans-serif;min-width:160px"><div style="font-weight:700;color:${STATUS_COLORS[cyl.status]};font-size:14px;margin-bottom:8px">${cyl.id}</div><div style="font-size:12px;line-height:1.8"><div><b>Tipo:</b> ${cyl.type}</div><div><b>Zona:</b> ${zn?zn.name:cyl.zoneId}</div><div><b>Estado:</b> ${STATUS_LABELS[cyl.status]}</div><div><b>Operador:</b> ${cyl.worker}</div><div><b>Pressão:</b> ${cyl.pres>0?cyl.pres+' bar':'—'}</div><div><b>Data:</b> ${cyl.ts}</div></div></div>`);
     marker.on('click',()=>selectCylinder(cyl.id));
     bottleMarkers.set(cyl.id,marker);
   });
-  
-  console.log(`${bottleMarkers.size} marcadores adicionados ao mapa`);
 }
 
-// Inicialização
 updateStats();renderList();renderDetail();
-
-// Aguardar o DOM estar completamente carregado antes de inicializar o mapa
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => initMap(), 100);
-  });
-} else {
-  setTimeout(() => initMap(), 100);
-}
+setTimeout(()=>initMap(),100);
 
 // Wire mobile search
 document.getElementById('sin-mobile')?.addEventListener('input',e=>{
@@ -860,8 +1099,11 @@ document.getElementById('sin').addEventListener('input',e=>{
   const m=document.getElementById('sin-mobile');
   if(m)m.value=e.target.value;
 });
-
-// Invalidar mapa ao redimensionar
+// Register service worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+// Invalidate map on resize
 window.addEventListener('resize',()=>{if(map)setTimeout(()=>map.invalidateSize(),100);});
 </script>
 </body>
