@@ -1137,8 +1137,8 @@ function cancelAdd(){
     fab.textContent='➕';
   }
 }
-window.confirmAdd=function(){
-  console.log('🔧 confirmAdd chamado (localStorage mode)');
+window.confirmAdd=async function(){
+  console.log('🔧 confirmAdd chamado (GitHub API mode)');
   const id=document.getElementById('am-id').value.trim();
   console.log('🔧 ID:', id);
   if(!id){alert('Introduz um ID.');return;}
@@ -1149,14 +1149,26 @@ window.confirmAdd=function(){
   const newCylinder={id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0};
   console.log('🔧 newCylinder:', newCylinder);
   
-  // Add directly to localStorage (no GitHub API)
-  cylinders.push(newCylinder);
-  saveData();
-  console.log('🔧 Cylinder adicionado ao localStorage');
+  // Try to sync with GitHub API first
+  console.log('🔧 A tentar criar cylinder no GitHub...');
+  const synced = await createCylinder(newCylinder);
+  console.log('🔧 Resultado do createCylinder:', synced);
+  
+  if (synced) {
+    // Add synced cylinder with GitHub ID
+    cylinders.push(synced);
+    showToast(`✅ ${id} adicionada e sincronizada com GitHub`);
+    console.log('🔧 Cylinder adicionado com sucesso via GitHub');
+  } else {
+    // Fallback: add locally only
+    cylinders.push(newCylinder);
+    saveData();
+    showToast(`⚠️ ${id} adicionada localmente (sem sincronização)`);
+    console.log('🔧 Cylinder adicionado localmente (fallback)');
+  }
   
   updateStats();renderList();updateMapMarkers();
   cancelAdd();
-  showToast(`✅ ${id} adicionada com sucesso`);
   console.log('🔧 confirmAdd concluído');
 };
 
