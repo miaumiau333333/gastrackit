@@ -574,7 +574,133 @@ function initializeWebSocket() {
   if (!syncEnabled) return;
   
   try {
-    socket = io('http://localhost:8080');
+    // GitHub API Configuration
+const GITHUB_TOKEN = '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'; // Token real
+const REPO_OWNER = 'andre.bras'; // Username real
+const REPO_NAME = 'ant';
+const GITHUB_API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+
+// GitHub API functions
+async function fetchCylinders() {
+  try {
+    const response = await fetch(`${GITHUB_API}/issues?labels=cilindro&state=all`, {
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    
+    if (response.ok) {
+      const issues = await response.json();
+      const cylinders = issues.map(issue => {
+        try {
+          return {
+            ...JSON.parse(issue.body || '{}'),
+            id: issue.id,
+            github_id: issue.number,
+            created_at: issue.created_at,
+            updated_at: issue.updated_at
+          };
+        } catch (e) {
+          return null;
+        }
+      }).filter(Boolean);
+      
+      return cylinders;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching cylinders:', error);
+    return [];
+  }
+}
+
+async function createCylinder(data) {
+  try {
+    const issueData = {
+      title: `Cilindro ${data.zona} - ${data.tipo}`,
+      body: JSON.stringify(data),
+      labels: ['cilindro', data.status]
+    };
+    
+    const response = await fetch(`${GITHUB_API}/issues`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(issueData)
+    });
+    
+    if (response.ok) {
+      const issue = await response.json();
+      return {
+        ...data,
+        id: issue.id,
+        github_id: issue.number,
+        created_at: issue.created_at
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error creating cylinder:', error);
+    return null;
+  }
+}
+
+async function updateCylinder(githubId, data) {
+  try {
+    const issueData = {
+      title: `Cilindro ${data.zona} - ${data.tipo}`,
+      body: JSON.stringify(data),
+      labels: ['cilindro', data.status]
+    };
+    
+    const response = await fetch(`${GITHUB_API}/issues/${githubId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(issueData)
+    });
+    
+    if (response.ok) {
+      const issue = await response.json();
+      return {
+        ...data,
+        id: issue.id,
+        github_id: issue.number,
+        updated_at: issue.updated_at
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error updating cylinder:', error);
+    return null;
+  }
+}
+
+async function deleteCylinder(githubId) {
+  try {
+    const response = await fetch(`${GITHUB_API}/issues/${githubId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ state: 'closed' })
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Error deleting cylinder:', error);
+    return false;
+  }
+}
     
     socket.on('connect', () => {
       console.log('🔄 Conectado ao servidor de sincronização');
@@ -668,30 +794,21 @@ async function deleteCylinderFromServer(id) {
 }
 
 // Função segura para carregar dados com validação
-function safeLoadData() {
+async function safeLoadData() {
   try {
-    const stored = localStorage.getItem('lisnave_data');
-    if (!stored) {
-      console.log('Nenhum dado encontrado, usando padrões');
+    // Carregar dados do GitHub API
+    const cylinders = await fetchCylinders();
+    
+    if (cylinders.length === 0) {
+      console.log('Nenhum cilindro encontrado no GitHub, usando padrões');
       return {
         cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
         workers: [...DEFAULT_WORKERS]
       };
     }
     
-    const data = JSON.parse(stored);
-    
-    // Validar estrutura
-    if (!data.cylinders || !Array.isArray(data.cylinders)) {
-      console.warn('Dados de cilindros inválidos, usando padrões');
-      return {
-        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
-        workers: data.workers || [...DEFAULT_WORKERS]
-      };
-    }
-    
     // Validar cada cilindro
-    const validCylinders = data.cylinders.filter(c => 
+    const validCylinders = cylinders.filter(c => 
       c && c.id && c.lat && c.lng && c.status && 
       typeof c.lat === 'number' && typeof c.lng === 'number'
     );
@@ -700,17 +817,17 @@ function safeLoadData() {
       console.warn('Nenhum cilindro válido encontrado, usando padrões');
       return {
         cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
-        workers: data.workers || [...DEFAULT_WORKERS]
+        workers: [...DEFAULT_WORKERS]
       };
     }
     
     return {
       cylinders: validCylinders,
-      workers: data.workers || [...DEFAULT_WORKERS]
+      workers: [...DEFAULT_WORKERS]
     };
     
   } catch (error) {
-    console.error('Erro ao carregar dados:', error);
+    console.error('Erro ao carregar dados do GitHub:', error);
     return {
       cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
       workers: [...DEFAULT_WORKERS]
@@ -718,9 +835,29 @@ function safeLoadData() {
   }
 }
 
-const data = safeLoadData();
-let cylinders = data.cylinders;
-let workers   = data.workers;
+// Inicialização assíncrona
+let cylinders = [];
+let workers = [...DEFAULT_WORKERS];
+
+// Carregar dados do GitHub quando a página carregar
+async function initializeApp() {
+  const data = await safeLoadData();
+  cylinders = data.cylinders;
+  workers = data.workers;
+  
+  // Inicializar mapa após carregar dados
+  initMap();
+  updateStats();
+  renderList();
+  renderDetail();
+}
+
+// Chamar inicialização quando o DOM estiver pronto
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+  initializeApp();
+}
 let selectedId=null, filterStatus='all', filterZone='', searchText='';
 let addingMode=false, pendingLat=null, pendingLng=null;
 let bottleMarkers=new Map(), editingId=null;
@@ -989,13 +1126,21 @@ window.confirmAdd=async function(){
   const zone=DEFAULT_ZONES.find(z=>z.id===zoneId);
   const newCylinder={id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0};
   
-  // Try to sync with server first
-  const synced = await saveCylinderToServer(newCylinder);
+  // Try to sync with GitHub API first
+  const synced = await createCylinder(newCylinder);
   
-  // Always add locally (works even if server fails)
-  cylinders.push(newCylinder);
-  saveData();updateStats();renderList();updateMapMarkers();
-  cancelAdd();showToast(`✅ ${id} adicionada${synced ? ' e sincronizada' : ''}`);
+  if (synced) {
+    // Add synced cylinder with GitHub ID
+    cylinders.push(synced);
+    showToast(`✅ ${id} adicionada e sincronizada com GitHub`);
+  } else {
+    // Fallback: add locally only
+    cylinders.push(newCylinder);
+    showToast(`⚠️ ${id} adicionada localmente (sem sincronização)`);
+  }
+  
+  updateStats();renderList();updateMapMarkers();
+  cancelAdd();
 };
 
 // ── EDIT ──
@@ -1240,8 +1385,7 @@ function updateMapMarkers(){
   });
 }
 
-updateStats();renderList();renderDetail();
-setTimeout(()=>initMap(),100);
+// Inicialização será feita no initializeApp após carregar dados do GitHub
 
 // Wire mobile search
 document.getElementById('sin-mobile')?.addEventListener('input',e=>{

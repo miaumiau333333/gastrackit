@@ -403,10 +403,8 @@ function initializeWebSocket() {
   if (!syncEnabled) return;
   
   try {
-    // Auto-detect server URL
-    const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-      ? `http://${window.location.hostname}:8080`
-      : `http://${window.location.hostname}:8080`;
+    // Use ngrok URL for external access
+    const serverUrl = 'https://ab3e-62-48-180-100.ngrok-free.app';
     
     socket = io(serverUrl);
     
