@@ -16,7 +16,7 @@
 <link rel="manifest" href="manifest.json?v=2">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<title>Lisnave — Rastreamento de Garrafas de Gás</title>
+<title>Lisnave — Rastreamento de Garrafas de Gás (v2025-04-29-10-42)</title>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
@@ -616,13 +616,16 @@ async function fetchCylinders() {
 }
 
 async function createCylinder(data) {
+  console.log('🔧 createCylinder iniciado com data:', data);
   try {
     const issueData = {
-      title: `Cilindro ${data.zona} - ${data.tipo}`,
+      title: `Cilindro ${data.zona || 'DS1'} - ${data.type || 'Acetileno'}`,
       body: JSON.stringify(data),
-      labels: ['cilindro', data.status]
+      labels: ['cilindro', data.status || 'ativa']
     };
+    console.log('🔧 issueData:', issueData);
     
+    console.log('🔧 A fazer POST para GitHub API...');
     const response = await fetch(`${GITHUB_API}/issues`, {
       method: 'POST',
       headers: {
@@ -633,18 +636,29 @@ async function createCylinder(data) {
       body: JSON.stringify(issueData)
     });
     
+    console.log('🔧 Response status:', response.status);
+    console.log('🔧 Response ok:', response.ok);
+    
     if (response.ok) {
+      console.log('🔧 A fazer parse do response...');
       const issue = await response.json();
-      return {
+      console.log('🔧 Issue criado:', issue);
+      const result = {
         ...data,
         id: issue.id,
         github_id: issue.number,
         created_at: issue.created_at
       };
+      console.log('🔧 Resultado final:', result);
+      return result;
+    } else {
+      console.error('🔧 Response não ok. Status:', response.status);
+      const errorText = await response.text();
+      console.error('🔧 Error response:', errorText);
+      return null;
     }
-    return null;
   } catch (error) {
-    console.error('Error creating cylinder:', error);
+    console.error('🔧 Error creating cylinder:', error);
     return null;
   }
 }
@@ -861,7 +875,7 @@ if (document.readyState === 'loading') {
 let selectedId=null, filterStatus='all', filterZone='', searchText='';
 let addingMode=false, pendingLat=null, pendingLng=null;
 let bottleMarkers=new Map(), editingId=null;
-let map, userMarker=null;
+let map, userMarker=null, tempMarker=null;
 let satelliteLayer=null, offlineOverlay=null, usingOfflineBase=false;
 const LISNAVE_BOUNDS = [
   [38.4700, -8.7980],  // Sul/Oeste expandido
@@ -1008,7 +1022,10 @@ function fillSelects(p){
 
 // ── ADD ON MAP ──
 function toggleAddMode(){
+  console.log('🔧 toggleAddMode chamado - addingMode antes:', addingMode);
   addingMode=!addingMode;
+  console.log('🔧 toggleAddMode - addingMode depois:', addingMode);
+  
   document.getElementById('btn-add-lost')?.classList.toggle('active',addingMode);
   // Sync mobile FAB
   const fab=document.getElementById('fab-add-btn');
@@ -1094,6 +1111,7 @@ function centerOnUser(){
   }
 }
 function openAddModal(lat,lng){
+  console.log('🔧 openAddModal chamado com lat:', lat, 'lng:', lng);
   pendingLat=lat;pendingLng=lng;
   fillSelects('am');
   const suggestedId=`GAS-${String(cylinders.length+1).padStart(3,'0')}`;
@@ -1104,7 +1122,9 @@ function openAddModal(lat,lng){
   document.getElementById('am-status').value='ativa';
   document.getElementById('am-pres').value='150';
   document.getElementById('am-ts').value=new Date().toISOString().slice(0,10);
+  console.log('🔧 Modal de adição sendo aberta...');
   document.getElementById('add-overlay').classList.add('open');
+  console.log('🔧 Modal de adição aberta com sucesso');
 }
 function cancelAdd(){
   document.getElementById('add-overlay').classList.remove('open');
@@ -1117,30 +1137,27 @@ function cancelAdd(){
     fab.textContent='➕';
   }
 }
-window.confirmAdd=async function(){
+window.confirmAdd=function(){
+  console.log('🔧 confirmAdd chamado (localStorage mode)');
   const id=document.getElementById('am-id').value.trim();
+  console.log('🔧 ID:', id);
   if(!id){alert('Introduz um ID.');return;}
   if(cylinders.find(c=>c.id===id)){alert(`ID "${id}" já existe.`);return;}
   const type=getType('am');
   const zoneId=document.getElementById('am-zone').value;
   const zone=DEFAULT_ZONES.find(z=>z.id===zoneId);
   const newCylinder={id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0};
+  console.log('🔧 newCylinder:', newCylinder);
   
-  // Try to sync with GitHub API first
-  const synced = await createCylinder(newCylinder);
-  
-  if (synced) {
-    // Add synced cylinder with GitHub ID
-    cylinders.push(synced);
-    showToast(`✅ ${id} adicionada e sincronizada com GitHub`);
-  } else {
-    // Fallback: add locally only
-    cylinders.push(newCylinder);
-    showToast(`⚠️ ${id} adicionada localmente (sem sincronização)`);
-  }
+  // Add directly to localStorage (no GitHub API)
+  cylinders.push(newCylinder);
+  saveData();
+  console.log('🔧 Cylinder adicionado ao localStorage');
   
   updateStats();renderList();updateMapMarkers();
   cancelAdd();
+  showToast(`✅ ${id} adicionada com sucesso`);
+  console.log('🔧 confirmAdd concluído');
 };
 
 // ── EDIT ──
@@ -1353,7 +1370,12 @@ function initMap(){
   }
 
   map.on('click',e=>{
-    if(!addingMode)return;
+    console.log('🔧 Clique no mapa - addingMode:', addingMode, 'coords:', e.latlng);
+    if(!addingMode){
+      console.log('🔧 Clique ignorado - modo adição não está ativo');
+      return;
+    }
+    console.log('🔧 Abrindo modal de adição em:', e.latlng.lat, e.latlng.lng);
     openAddModal(e.latlng.lat,e.latlng.lng);
   });
 

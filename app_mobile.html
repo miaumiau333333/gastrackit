@@ -360,7 +360,7 @@ body{display:flex;flex-direction:column;padding:0}
 // Global variables
 let map, cylinders = [], workers = [], selectedId = null, filterStatus = 'all', filterZone = '', searchText = '';
 let addingMode = false, pendingLat = null, pendingLng = null, editingId = null;
-let userMarker = null, usingOfflineBase = false, bottleMarkers = new Map();
+let userMarker = null, usingOfflineBase = false, bottleMarkers = new Map(), tempMarker = null;
 let mobileListOpen = false;
 
 // WebSocket synchronization variables
