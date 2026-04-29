@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <title>Lisnave — Rastreamento de Garrafas de Gás</title>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 :root {
   --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -210,6 +211,29 @@ body{display:flex;flex-direction:column;padding:0}
   50%{box-shadow:0 4px 28px rgba(226,75,74,.8)}
 }
 
+/* Sync status indicator */
+#sync-status {
+  position: absolute;
+  top: 70px;
+  right: 16px;
+  background: var(--color-accent);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+#sync-status.connected {
+  opacity: 1;
+  background: #28a745;
+}
+#sync-status.disconnected {
+  background: #dc3545;
+}
+
 /* Mobile: bottom sheet for list */
 #sb-sheet {
   display: none;
@@ -355,6 +379,7 @@ body.mobile-list-collapsed #sb { display: none; }
     </div>
     <button id="cfg-btn" onclick="openModal()">⚙️ Configurar</button>
     <div id="rtb"><div id="rdot"></div>TEMPO REAL</div>
+    <div id="sync-status">🔄 Conectado</div>
     <img src="logotipo_lisnave.png" alt="Logo Lisnave" class="logo-tb" onerror="this.style.display='none'">
   </div>
   <div id="bdy">
@@ -540,6 +565,108 @@ const STATUS_COLORS = {ativa:'#e24b4a',recolha:'#ef9f27',recuperada:'#639922'};
 const STATUS_LABELS = {ativa:'Ativa',recolha:'Em Recolha',recuperada:'Recuperada'};
 const BASE_TYPES = ['Acetileno','Oxigénio','Propano','CO₂','Árgon'];
 
+// WebSocket synchronization variables
+let socket;
+let syncEnabled = true; // Can be toggled for offline mode
+
+// WebSocket synchronization functions
+function initializeWebSocket() {
+  if (!syncEnabled) return;
+  
+  try {
+    socket = io('http://localhost:3000');
+    
+    socket.on('connect', () => {
+      console.log('🔄 Conectado ao servidor de sincronização');
+      updateSyncStatus(true);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('❌ Desconectado do servidor');
+      updateSyncStatus(false);
+    });
+    
+    socket.on('initialData', (data) => {
+      console.log('📥 Dados iniciais recebidos:', data);
+      cylinders = data.cylinders;
+      workers = data.workers;
+      updateUI();
+    });
+    
+    socket.on('dataUpdate', (data) => {
+      console.log('🔄 Atualização em tempo real recebida');
+      cylinders = data.cylinders;
+      workers = data.workers;
+      updateUI();
+      showToast('🔄 Dados sincronizados');
+    });
+  } catch (error) {
+    console.warn('WebSocket não disponível, usando modo offline');
+    updateSyncStatus(false);
+  }
+}
+
+function updateSyncStatus(connected) {
+  const statusEl = document.getElementById('sync-status');
+  if (connected) {
+    statusEl.textContent = '🔄 Conectado';
+    statusEl.className = 'connected';
+  } else {
+    statusEl.textContent = '❌ Desconectado';
+    statusEl.className = 'disconnected';
+  }
+}
+
+// API functions for server communication
+async function saveCylinderToServer(cylinder) {
+  if (!syncEnabled || !socket) return false;
+  
+  try {
+    const response = await fetch('/api/cylinders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cylinder)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao salvar garrafa:', error);
+    showToast('❌ Erro ao sincronizar');
+    return false;
+  }
+}
+
+async function updateCylinderOnServer(id, cylinder) {
+  if (!syncEnabled || !socket) return false;
+  
+  try {
+    const response = await fetch(`/api/cylinders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cylinder)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao atualizar garrafa:', error);
+    showToast('❌ Erro ao sincronizar');
+    return false;
+  }
+}
+
+async function deleteCylinderFromServer(id) {
+  if (!syncEnabled || !socket) return false;
+  
+  try {
+    const response = await fetch(`/api/cylinders/${id}`, {
+      method: 'DELETE'
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao remover garrafa:', error);
+    showToast('❌ Erro ao sincronizar');
+    return false;
+  }
+}
+
 // Função segura para carregar dados com validação
 function safeLoadData() {
   try {
@@ -612,7 +739,13 @@ function now(){return new Date().toLocaleDateString('pt-PT',{day:'2-digit',month
 function isoToDisplay(iso){if(!iso)return now();const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
 // Convert display format dd/mm/aaaa to ISO YYYY-MM-DD for <input type="date">
 function displayToIso(disp){if(!disp)return new Date().toISOString().slice(0,10);const parts=disp.split('/');if(parts.length===3)return`${parts[2]}-${parts[1]}-${parts[0]}`;return new Date().toISOString().slice(0,10);}
-function saveData(){localStorage.setItem('lisnave_data',JSON.stringify({cylinders,workers}));}
+function saveData(){
+  // Always save to localStorage as backup
+  localStorage.setItem('lisnave_data',JSON.stringify({cylinders,workers}));
+  
+  // If sync is enabled and connected, the server handles the broadcast
+  // Individual operations (add/edit/delete) will call server APIs directly
+}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3000);}
 
 // ── STATS ──
@@ -695,15 +828,25 @@ function selectCylinder(id){
   if(marker)marker.openPopup();
 }
 
-window.setStatus=function(id,status){
+window.setStatus=async function(id,status){
   const c=cylinders.find(x=>x.id===id);
   if(c){c.status=status;if(status==='recuperada')c.pres=0;}
-  saveData();updateStats();renderList();renderDetail();showToast(`${id} → ${STATUS_LABELS[status]}`);
+  
+  // Try to sync with server first
+  const synced = await updateCylinderOnServer(id, c);
+  
+  // Always save locally (works even if server fails)
+  saveData();updateStats();renderList();renderDetail();showToast(`${id} → ${STATUS_LABELS[status]}${synced ? ' e sincronizada' : ''}`);
 };
-window.deleteCylinder=function(id){
+window.deleteCylinder=async function(id){
   if(!confirm(`Remover ${id}?`))return;
+  
+  // Try to sync with server first
+  const synced = await deleteCylinderFromServer(id);
+  
+  // Always remove locally (works even if server fails)
   cylinders=cylinders.filter(c=>c.id!==id);selectedId=null;
-  saveData();updateStats();renderList();renderDetail();updateMapMarkers();showToast(`${id} removida`);
+  saveData();updateStats();renderList();renderDetail();updateMapMarkers();showToast(`${id} removida${synced ? ' e sincronizada' : ''}`);
 };
 
 // ── CUSTOM GAS TYPE ──
@@ -837,16 +980,22 @@ function cancelAdd(){
     fab.textContent='➕';
   }
 }
-window.confirmAdd=function(){
+window.confirmAdd=async function(){
   const id=document.getElementById('am-id').value.trim();
   if(!id){alert('Introduz um ID.');return;}
   if(cylinders.find(c=>c.id===id)){alert(`ID "${id}" já existe.`);return;}
   const type=getType('am');
   const zoneId=document.getElementById('am-zone').value;
   const zone=DEFAULT_ZONES.find(z=>z.id===zoneId);
-  cylinders.push({id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0});
+  const newCylinder={id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0};
+  
+  // Try to sync with server first
+  const synced = await saveCylinderToServer(newCylinder);
+  
+  // Always add locally (works even if server fails)
+  cylinders.push(newCylinder);
   saveData();updateStats();renderList();updateMapMarkers();
-  cancelAdd();showToast(`✅ ${id} adicionada`);
+  cancelAdd();showToast(`✅ ${id} adicionada${synced ? ' e sincronizada' : ''}`);
 };
 
 // ── EDIT ──
@@ -865,7 +1014,7 @@ function openEdit(id){
   document.getElementById('edit-overlay').classList.add('open');
 }
 function closeEdit(){document.getElementById('edit-overlay').classList.remove('open');editingId=null;}
-window.saveEdit=function(){
+window.saveEdit=async function(){
   const c=cylinders.find(x=>x.id===editingId);if(!c)return;
   c.type=getType('em');
   c.zoneId=document.getElementById('em-zone').value;
@@ -874,8 +1023,13 @@ window.saveEdit=function(){
   c.pres=parseInt(document.getElementById('em-pres').value)||0;
   const tsIso=document.getElementById('em-ts').value;
   if(tsIso)c.ts=isoToDisplay(tsIso);
+  
+  // Try to sync with server first
+  const synced = await updateCylinderOnServer(editingId, c);
+  
+  // Always save locally (works even if server fails)
   saveData();updateStats();renderList();renderDetail();updateMapMarkers();
-  closeEdit();showToast(`✅ ${c.id} atualizada`);
+  closeEdit();showToast(`✅ ${c.id} atualizada${synced ? ' e sincronizada' : ''}`);
 };
 
 // ── EVENTS ──
@@ -958,7 +1112,20 @@ window.exportData=function(){const blob=new Blob([JSON.stringify({cylinders,work
 window.importData=function(){const file=document.getElementById('import-file').files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);cylinders=data.cylinders;workers=data.workers;saveData();updateStats();renderList();updateMapMarkers();closeModal();}catch{alert('Ficheiro inválido');}};reader.readAsText(file);};
 
 function initMap(){
-  map=L.map('map',{zoomControl:true,attributionControl:true,minZoom:14,maxZoom:19}).setView([38.4777,-8.7934],17);
+  // Limites expandidos: área muito maior para mais liberdade
+  const EXPANDED_BOUNDS = [
+    [38.4500, -8.8200],  // Sul/Oeste - margem generosa
+    [38.5050, -8.7650]   // Norte/Leste - margem generosa
+  ];
+  
+  map=L.map('map',{
+    zoomControl:true,
+    attributionControl:true,
+    minZoom:14,
+    maxZoom:19,
+    maxBounds: EXPANDED_BOUNDS,
+    maxBoundsViscosity: 0.1  // Resistência mínima (quase livre)
+  }).setView([38.4777,-8.7934],17);
   satelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
     maxZoom:19,
     maxNativeZoom:19,
@@ -1092,6 +1259,9 @@ document.getElementById('sin').addEventListener('input',e=>{
   const m=document.getElementById('sin-mobile');
   if(m)m.value=e.target.value;
 });
+// Initialize WebSocket for real-time sync
+initializeWebSocket();
+
 // Register service worker
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
