@@ -276,7 +276,7 @@ def run_server():
     # Create server
     handler = WebSocketHandler
     
-    with socketserver.TCPServer(("", PORT), handler) as httpd:
+    with socketserver.TCPServer(("0.0.0.0", PORT), handler) as httpd:
         print(f"Lisnave Gas Tracker Server (Python) running on port {PORT}")
         print(f"Access: http://localhost:{PORT}")
         print(f"Ready for real-time sync")

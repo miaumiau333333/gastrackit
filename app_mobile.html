@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ef9f27">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lisnave Gas">
+<meta name="application-name" content="Lisnave Gas">
+<meta name="msapplication-TileColor" content="#1a3f7a">
+<meta name="msapplication-TileImage" content="icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="shortcut icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json?v=2">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<title>Lisnave — Rastreamento de Garrafas de Gás</title>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+:root {
+  --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Consolas', 'Courier New', monospace;
+  --border-radius-md: 8px;
+  --color-bg: #f5f7fa;
+  --color-bg2: #ffffff;
+  --color-bg3: #e9ecf1;
+  --color-text: #1a1a1a;
+  --color-text2: #666666;
+  --color-border: #e0e5eb;
+  --color-accent: #ef9f27;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.16);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--color-bg);font-family:var(--font-sans)}
+body{display:flex;flex-direction:column;padding:0}
+#app{height:100vh;display:flex;flex-direction:column;width:100%}
+
+/* TOOLBAR */
+#tb{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--color-border);background:var(--color-bg2);flex-shrink:0;position:relative;z-index:3000;box-shadow:var(--shadow-sm)}
+#bnd{display:flex;align-items:center;gap:12px}
+#bico{width:44px;height:44px;flex-shrink:0}
+#bnm{font-size:14px;font-weight:700;letter-spacing:2px;color:var(--color-text)}
+#bsub{font-size:11px;color:var(--color-text2);margin-top:2px;font-weight:500}
+#sbar{display:flex;gap:12px;margin-left:auto}
+.sc{background:var(--color-bg3);border:none;border-radius:var(--border-radius-md);padding:8px 14px;text-align:center;min-width:70px;cursor:pointer;transition:all .3s}
+.sc:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.sc.active{background:var(--color-accent);color:white}
+
+/* Sync status indicator */
+#sync-status {
+  position: absolute;
+  top: 70px;
+  right: 16px;
+  background: var(--color-accent);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+#sync-status.connected {
+  opacity: 1;
+  background: #28a745;
+}
+#sync-status.disconnected {
+  background: #dc3545;
+}
+
+/* BODY */
+#bdy{flex:1;display:flex;position:relative;overflow:hidden}
+
+/* SIDEBAR */
+#sb{width:380px;flex-shrink:0;display:flex;flex-direction:column;background:var(--color-bg2);border-right:1px solid var(--color-border);overflow:hidden}
+#ssr{padding:12px;border-bottom:1px solid var(--color-border)}
+#sin{width:100%;padding:10px;border:1px solid var(--color-border);border-radius:var(--border-radius-md);font-size:14px;background:var(--color-bg)}
+#sfil{padding:12px;display:flex;gap:8px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.fch{padding:6px 12px;border:1px solid var(--color-border);border-radius:20px;background:var(--color-bg2);cursor:pointer;font-size:12px;transition:all .2s}
+.fch.on{background:var(--color-accent);color:white;border-color:var(--color-accent)}
+#szn{padding:12px;border-bottom:1px solid var(--color-border)}
+#zsel{width:100%;padding:8px;border:1px solid var(--color-border);border-radius:var(--border-radius-md);background:var(--color-bg)}
+#clist{flex:1;overflow-y:auto;padding:12px}
+
+/* MAP COLUMN */
+#mapcol{flex:1;display:flex;flex-direction:column;position:relative}
+#map{flex:1}
+#map-toolbar{position:absolute;top:12px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+.map-btn{background:white;border:1px solid var(--color-border);border-radius:var(--border-radius-md);padding:8px 12px;cursor:pointer;font-size:12px;box-shadow:var(--shadow-sm);transition:all .2s}
+.map-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
+
+/* LIST ITEM */
+.c-item{background:var(--color-bg2);border:1px solid var(--color-border);border-radius:var(--border-radius-md);padding:12px;margin-bottom:8px;cursor:pointer;transition:all .2s}
+.c-item:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.c-item.selected{border-color:var(--color-accent);box-shadow:0 0 0 2px rgba(239,159,39,0.2)}
+.c-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.c-id{font-weight:700;color:var(--color-text)}
+.c-status{padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;color:white}
+.c-info{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--color-text2)}
+.c-info span{background:var(--color-bg3);padding:2px 6px;border-radius:4px}
+
+/* DETAIL PANEL */
+#dp{width:320px;flex-shrink:0;background:var(--color-bg2);border-left:1px solid var(--color-border);display:none;flex-direction:column}
+#dp.open{display:flex}
+#dp-header{padding:16px;border-bottom:1px solid var(--color-border)}
+#dp-title{font-size:16px;font-weight:700;margin-bottom:4px}
+#dp-subtitle{font-size:12px;color:var(--color-text2)}
+#dp-body{flex:1;padding:16px;overflow-y:auto}
+.d-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--color-border)}
+.d-label{font-size:12px;color:var(--color-text2)}
+.d-value{font-size:12px;font-weight:600;color:var(--color-text)}
+#dp-actions{padding:16px;border-top:1px solid var(--color-border);display:flex;gap:8px}
+.d-btn{flex:1;padding:8px;border:none;border-radius:var(--border-radius-md);cursor:pointer;font-size:12px;transition:all .2s}
+.d-btn.primary{background:var(--color-accent);color:white}
+.d-btn.danger{background:#dc3545;color:white}
+.d-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+
+/* MODALS */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:4000;display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--color-bg2);border-radius:var(--border-radius-md);max-width:500px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-header{padding:20px;border-bottom:1px solid var(--color-border)}
+.modal-title{font-size:18px;font-weight:700}
+.modal-body{padding:20px}
+.form-group{margin-bottom:16px}
+.form-label{display:block;margin-bottom:4px;font-size:12px;font-weight:600;color:var(--color-text2)}
+.form-input, .form-select{width:100%;padding:8px;border:1px solid var(--color-border);border-radius:var(--border-radius-md);font-size:14px;background:var(--color-bg)}
+.modal-actions{padding:20px;border-top:1px solid var(--color-border);display:flex;gap:8px}
+.btn{flex:1;padding:10px;border:none;border-radius:var(--border-radius-md);cursor:pointer;font-size:14px;transition:all .2s}
+.btn.primary{background:var(--color-accent);color:white}
+.btn.secondary{background:var(--color-bg3);color:var(--color-text)}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--color-text);color:white;padding:12px 20px;border-radius:20px;font-size:12px;z-index:5000;opacity:0;transition:opacity .3s}
+#toast.show{opacity:1}
+
+/* Mobile */
+@media(max-width:900px){
+  #sb{position:absolute;left:0;top:0;bottom:0;z-index:2000;transform:translateX(-100%);transition:transform .3s}
+  #sb.open{transform:translateX(0)}
+  #dp{position:absolute;right:0;top:0;bottom:0;z-index:2000;transform:translateX(100%);transition:transform .3s}
+  #dp.open{transform:translateX(0)}
+  .mobile-only{display:block}
+}
+
+/* FAB */
+.fab{position:absolute;bottom:20px;right:20px;width:56px;height:56px;border-radius:50%;border:none;box-shadow:var(--shadow-lg);cursor:pointer;font-size:20px;z-index:1000;transition:all .15s}
+.fab:active{transform:scale(.9)}
+#fab-list-btn{background:white;color:var(--color-accent)}
+#fab-locate-btn{background:#4285F4;color:white}
+#fab-add-btn{background:var(--color-accent);color:white}
+#fab-add-btn.active{background:#e24b4a;animation:fab-pulse 1.5s infinite}
+@keyframes fab-pulse{
+  0%,100%{box-shadow:0 4px 16px rgba(226,75,74,.4)}
+  50%{box-shadow:0 4px 28px rgba(226,75,74,.8)}
+}
+
+/* Mobile bottom sheet */
+#sb-sheet{display:none;position:absolute;left:0;right:0;bottom:0;background:var(--color-bg2);border-radius:18px 18px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.2);z-index:2000;flex-direction:column;transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);max-height:78dvh;padding-bottom:env(safe-area-inset-bottom,0px)}
+#sb-sheet.open{transform:translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="tb">
+    <div id="bnd">
+      <div id="bico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+      </div>
+      <div>
+        <div id="bnm">LISNAVE</div>
+        <div id="bsub">Rastreamento de Garrafas de Gás</div>
+      </div>
+    </div>
+    <div id="sbar">
+      <div class="sc" onclick="filterBy('all')"><div class="sv" id="sv0">—</div><div class="sl">Total</div></div>
+      <div class="sc s1" onclick="filterBy('ativa')"><div class="sv" id="sv1">—</div><div class="sl">Ativas</div></div>
+      <div class="sc s2" onclick="filterBy('recolha')"><div class="sv" id="sv2">—</div><div class="sl">Recolha</div></div>
+      <div class="sc s3" onclick="filterBy('recuperada')"><div class="sv" id="sv3">—</div><div class="sl">Recuperadas</div></div>
+    </div>
+    <button id="cfg-btn" onclick="openModal()">⚙️ Configurar</button>
+    <div id="rtb"><div id="rdot"></div>TEMPO REAL</div>
+    <div id="sync-status">🔄 Conectado</div>
+    <img src="logotipo_lisnave.png" alt="Logo Lisnave" class="logo-tb" onerror="this.style.display='none'">
+  </div>
+  <div id="bdy">
+    <div id="sb">
+      <div id="ssr"><input type="text" id="sin" placeholder="🔍 Pesquisar..."/></div>
+      <div id="sfil">
+        <button class="fch on" data-f="all">Todas</button>
+        <button class="fch" data-f="ativa">🔴 Ativas</button>
+        <button class="fch" data-f="recolha">🟠 Recolha</button>
+        <button class="fch" data-f="recuperada">🟢 Recuperadas</button>
+      </div>
+      <div id="szn"><select id="zsel"><option value="">Todas as zonas</option></select></div>
+      <div id="clist"></div>
+    </div>
+    <div id="mapcol">
+      <div id="map"></div>
+      <div id="map-toolbar">
+        <button class="map-btn mobile-only" id="btn-toggle-list" onclick="toggleMobileList()">📋 Esconder Lista</button>
+        <button class="map-btn" id="btn-add-lost" onclick="toggleAddMode()">➕ Adicionar no Mapa</button>
+      </div>
+      <button class="fab mobile-only" id="fab-list-btn" onclick="toggleMobileList()">📋</button>
+      <button class="fab mobile-only" id="fab-locate-btn" onclick="locateUser()">📍</button>
+      <button class="fab mobile-only" id="fab-add-btn" onclick="toggleAddMode()">➕</button>
+    </div>
+    <div id="dp">
+      <div id="dp-header">
+        <div id="dp-title">—</div>
+        <div id="dp-subtitle">—</div>
+      </div>
+      <div id="dp-body"></div>
+      <div id="dp-actions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div id="add-overlay" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">➕ Adicionar Garrafa</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">ID</label>
+        <input type="text" id="am-id" class="form-input" placeholder="GAS-XXX"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de Gás</label>
+        <select id="am-type" class="form-select" onchange="toggleCustom('am')">
+          <option value="">Selecione...</option>
+        </select>
+        <div id="am-cg" style="display:none;margin-top:8px">
+          <input type="text" id="am-ct" class="form-input" placeholder="Nome do tipo personalizado"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Zona</label>
+        <select id="am-zone" class="form-select"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Operador</label>
+        <select id="am-worker" class="form-select"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="am-status" class="form-select">
+          <option value="ativa">🔴 Ativa</option>
+          <option value="recolha">🟠 Em Recolha</option>
+          <option value="recuperada">🟢 Recuperada</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pressão (bar)</label>
+        <input type="number" id="am-pres" class="form-input" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data Teste</label>
+        <input type="date" id="am-ts" class="form-input"/>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="cancelAdd()">Cancelar</button>
+      <button class="btn primary" onclick="confirmAdd()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="edit-overlay" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div id="edit-title" class="modal-title">✏️ Editar</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">ID</label>
+        <input type="text" id="em-id" class="form-input" readonly/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de Gás</label>
+        <select id="em-type" class="form-select" onchange="toggleCustom('em')">
+          <option value="">Selecione...</option>
+        </select>
+        <div id="em-cg" style="display:none;margin-top:8px">
+          <input type="text" id="em-ct" class="form-input" placeholder="Nome do tipo personalizado"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Zona</label>
+        <select id="em-zone" class="form-select"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Operador</label>
+        <select id="em-worker" class="form-select"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="em-status" class="form-select">
+          <option value="ativa">🔴 Ativa</option>
+          <option value="recolha">🟠 Em Recolha</option>
+          <option value="recuperada">🟢 Recuperada</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pressão (bar)</label>
+        <input type="number" id="em-pres" class="form-input"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data Teste</label>
+        <input type="date" id="em-ts" class="form-input"/>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeEdit()">Cancelar</button>
+      <button class="btn primary" onclick="saveEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Config Modal -->
+<div id="modal-overlay" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚙️ Configurações</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Tipo de Gás Personalizado</label>
+        <input type="text" id="cg-name" class="form-input" placeholder="Nome do novo tipo"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Operadores</label>
+        <div id="workers-list"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveConfig()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// Global variables
+let map, cylinders = [], workers = [], selectedId = null, filterStatus = 'all', filterZone = '', searchText = '';
+let addingMode = false, pendingLat = null, pendingLng = null, editingId = null;
+let userMarker = null, usingOfflineBase = false, bottleMarkers = new Map();
+let mobileListOpen = false;
+
+// WebSocket synchronization variables
+let socket;
+let syncEnabled = true; // Can be toggled for offline mode
+
+// Constants
+const LISNAVE_BOUNDS = [[38.472, -8.797], [38.482, -8.787]];
+const DEFAULT_ZONES = [
+  {id:'DS1',name:'Doca Seca 1',   lat:38.479, lng:-8.792},
+  {id:'DS2',name:'Doca Seca 2',   lat:38.478, lng:-8.793},
+  {id:'DS3',name:'Doca Seca 3',   lat:38.477, lng:-8.794},
+  {id:'OM', name:'Oficina Mecânica',lat:38.476,lng:-8.792},
+  {id:'OE', name:'Oficina Elétrica',lat:38.476,lng:-8.793},
+  {id:'AC', name:'Armazém Central',lat:38.476,lng:-8.794},
+  {id:'PIN',name:'Pintura Naval',  lat:38.475,lng:-8.795},
+  {id:'CAIS',name:'Cais Principal',lat:38.474,lng:-8.793},
+];
+const DEFAULT_WORKERS = ['J. Ferreira','M. Santos','R. Costa','A. Lopes','C. Mendes','P. Sousa'];
+const DEFAULT_CYLINDERS = [
+  {id:'GAS-001',type:'Acetileno',zoneId:'DS1',lat:38.479,  lng:-8.792, status:'ativa',     ts:'01/01/2025',worker:'J. Ferreira',pres:145},
+  {id:'GAS-002',type:'Oxigénio', zoneId:'DS1',lat:38.4791, lng:-8.7921,status:'recolha',   ts:'15/01/2025',worker:'M. Santos',  pres:198},
+  {id:'GAS-003',type:'Propano',  zoneId:'DS2',lat:38.478,  lng:-8.793, status:'ativa',     ts:'20/01/2025',worker:'R. Costa',   pres:87},
+  {id:'GAS-004',type:'Acetileno',zoneId:'DS2',lat:38.4781, lng:-8.7931,status:'recuperada',ts:'05/02/2025',worker:'A. Lopes',   pres:0},
+  {id:'GAS-005',type:'CO₂',     zoneId:'DS3',lat:38.477,  lng:-8.794, status:'ativa',     ts:'10/02/2025',worker:'C. Mendes',  pres:220},
+  {id:'GAS-006',type:'Árgon',   zoneId:'DS3',lat:38.4771, lng:-8.7941,status:'ativa',     ts:'14/02/2025',worker:'P. Sousa',   pres:175},
+  {id:'GAS-007',type:'Oxigénio', zoneId:'OM', lat:38.476,  lng:-8.792, status:'recolha',   ts:'01/03/2025',worker:'J. Ferreira',pres:134},
+  {id:'GAS-008',type:'Acetileno',zoneId:'OE', lat:38.476,  lng:-8.793, status:'ativa',     ts:'10/03/2025',worker:'M. Santos',  pres:156},
+  {id:'GAS-009',type:'Propano',  zoneId:'AC', lat:38.476,  lng:-8.794, status:'recuperada',ts:'20/03/2025',worker:'R. Costa',   pres:0},
+  {id:'GAS-010',type:'CO₂',     zoneId:'PIN',lat:38.475,  lng:-8.795, status:'ativa',     ts:'01/04/2025',worker:'A. Lopes',   pres:201},
+  {id:'GAS-011',type:'Árgon',   zoneId:'CAIS',lat:38.474, lng:-8.793, status:'recolha',   ts:'10/04/2025',worker:'C. Mendes',  pres:88},
+  {id:'GAS-012',type:'Acetileno',zoneId:'DS1',lat:38.4792, lng:-8.7922,status:'ativa',     ts:'15/04/2025',worker:'P. Sousa',   pres:167},
+];
+const STATUS_COLORS = {ativa:'#e24b4a',recolha:'#ef9f27',recuperada:'#639922'};
+const STATUS_LABELS = {ativa:'Ativa',recolha:'Em Recolha',recuperada:'Recuperada'};
+const BASE_TYPES = ['Acetileno','Oxigénio','Propano','CO₂','Árgon'];
+
+// WebSocket synchronization functions
+function initializeWebSocket() {
+  if (!syncEnabled) return;
+  
+  try {
+    // Auto-detect server URL
+    const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? `http://${window.location.hostname}:8080`
+      : `http://${window.location.hostname}:8080`;
+    
+    socket = io(serverUrl);
+    
+    socket.on('connect', () => {
+      console.log('🔄 Conectado ao servidor de sincronização');
+      updateSyncStatus(true);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('❌ Desconectado do servidor');
+      updateSyncStatus(false);
+    });
+    
+    socket.on('initialData', (data) => {
+      console.log('📥 Dados iniciais recebidos:', data);
+      cylinders = data.cylinders;
+      workers = data.workers;
+      updateUI();
+    });
+    
+    socket.on('dataUpdate', (data) => {
+      console.log('🔄 Atualização em tempo real recebida');
+      cylinders = data.cylinders;
+      workers = data.workers;
+      updateUI();
+      showToast('🔄 Dados sincronizados');
+    });
+  } catch (error) {
+    console.warn('WebSocket não disponível, usando modo offline');
+    updateSyncStatus(false);
+  }
+}
+
+function updateSyncStatus(connected) {
+  const statusEl = document.getElementById('sync-status');
+  if (connected) {
+    statusEl.textContent = '🔄 Conectado';
+    statusEl.className = 'connected';
+  } else {
+    statusEl.textContent = '❌ Desconectado';
+    statusEl.className = 'disconnected';
+  }
+}
+
+// API functions for server communication
+async function saveCylinderToServer(cylinder) {
+  if (!syncEnabled || !socket) return false;
+  
+  try {
+    const response = await fetch('/api/cylinders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cylinder)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao salvar garrafa:', error);
+    showToast('❌ Erro ao sincronizar');
+    return false;
+  }
+}
+
+async function updateCylinderOnServer(id, cylinder) {
+  if (!syncEnabled || !socket) return false;
+  
+  try {
+    const response = await fetch(`/api/cylinders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cylinder)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao atualizar garrafa:', error);
+    showToast('❌ Erro ao sincronizar');
+    return false;
+  }
+}
+
+async function deleteCylinderFromServer(id) {
+  if (!syncEnabled || !socket) return false;
+  
+  try {
+    const response = await fetch(`/api/cylinders/${id}`, {
+      method: 'DELETE'
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao remover garrafa:', error);
+    showToast('❌ Erro ao sincronizar');
+    return false;
+  }
+}
+
+// Safe data loading
+function safeLoadData() {
+  try {
+    const stored = localStorage.getItem('lisnave_data');
+    if (!stored) {
+      console.log('Nenhum dado encontrado, usando padrões');
+      return {
+        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
+        workers: [...DEFAULT_WORKERS]
+      };
+    }
+    const parsed = JSON.parse(stored);
+    if (!parsed.cylinders || !Array.isArray(parsed.cylinders)) {
+      console.warn('Dados corrompidos, usando padrões');
+      return {
+        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
+        workers: parsed.workers || [...DEFAULT_WORKERS]
+      };
+    }
+    return parsed;
+  } catch (e) {
+    console.error('Erro ao carregar dados:', e);
+    return {
+      cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
+      workers: [...DEFAULT_WORKERS]
+    };
+  }
+}
+
+// Save data
+function saveData(){
+  // Always save to localStorage as backup
+  localStorage.setItem('lisnave_data',JSON.stringify({cylinders,workers}));
+  
+  // If sync is enabled and connected, the server handles the broadcast
+  // Individual operations (add/edit/delete) will call server APIs directly
+}
+
+// Utility functions
+function now(){return new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function isoToDisplay(iso){if(!iso)return now();const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
+function displayToIso(disp){if(!disp)return new Date().toISOString().slice(0,10);const parts=disp.split('/');if(parts.length===3)return`${parts[2]}-${parts[1]}-${parts[0]}`;return new Date().toISOString().slice(0,10);}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3000);}
+
+// Stats
+function updateStats(){
+  document.getElementById('sv0').textContent=cylinders.length;
+  document.getElementById('sv1').textContent=cylinders.filter(c=>c.status==='ativa').length;
+  document.getElementById('sv2').textContent=cylinders.filter(c=>c.status==='recolha').length;
+  document.getElementById('sv3').textContent=cylinders.filter(c=>c.status==='recuperada').length;
+}
+
+// Filter
+function filterBy(status){
+  filterStatus=status;
+  document.querySelectorAll('#sbar .sc').forEach((el,i)=>el.classList.toggle('active',['all','ativa','recolha','recuperada'][i]===status));
+  document.querySelectorAll('.fch').forEach(b=>b.classList.toggle('on',b.dataset.f===status));
+  renderList();updateMapMarkers();
+  const msgs={all:'📊 Todas as garrafas',ativa:'🔴 Apenas Ativas',recolha:'🟠 Apenas Em Recolha',recuperada:'🟢 Apenas Recuperadas'};
+  showToast(msgs[status]);
+}
+
+// List rendering
+function renderList(){
+  const cl=document.getElementById('clist');
+  const filtered=cylinders.filter(c=>{
+    const s=filterStatus==='all'||c.status===filterStatus;
+    const z=!filterZone||c.zoneId===filterZone;
+    const t=!searchText||c.id.toLowerCase().includes(searchText.toLowerCase())||c.type.toLowerCase().includes(searchText.toLowerCase())||c.worker.toLowerCase().includes(searchText.toLowerCase());
+    return s&&z&&t;
+  });
+  cl.innerHTML=filtered.map(c=>`
+    <div class="c-item ${selectedId===c.id?'selected':''}" onclick="select('${c.id}')">
+      <div class="c-header">
+        <div class="c-id">${c.id}</div>
+        <div class="c-status" style="background:${STATUS_COLORS[c.status]}">${STATUS_LABELS[c.status]}</div>
+      </div>
+      <div class="c-info">
+        <span>🧪 ${c.type}</span>
+        <span>📍 ${c.zoneId}</span>
+        <span>👷 ${c.worker}</span>
+        <span>📅 ${c.ts}</span>
+        <span>⚡ ${c.pres}bar</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Detail panel
+function renderDetail(){
+  const dp=document.getElementById('dp');
+  if(!selectedId){dp.classList.remove('open');return;}
+  const c=cylinders.find(x=>x.id===selectedId);
+  if(!c){dp.classList.remove('open');return;}
+  dp.classList.add('open');
+  document.getElementById('dp-title').textContent=c.id;
+  document.getElementById('dp-subtitle').textContent=`${c.type} • ${c.zoneId}`;
+  document.getElementById('dp-body').innerHTML=`
+    <div class="d-row"><div class="d-label">ID</div><div class="d-value">${c.id}</div></div>
+    <div class="d-row"><div class="d-label">Tipo</div><div class="d-value">${c.type}</div></div>
+    <div class="d-row"><div class="d-label">Zona</div><div class="d-value">${c.zoneId}</div></div>
+    <div class="d-row"><div class="d-label">Operador</div><div class="d-value">${c.worker}</div></div>
+    <div class="d-row"><div class="d-label">Status</div><div class="d-value">${STATUS_LABELS[c.status]}</div></div>
+    <div class="d-row"><div class="d-label">Pressão</div><div class="d-value">${c.pres} bar</div></div>
+    <div class="d-row"><div class="d-label">Data Teste</div><div class="d-value">${c.ts}</div></div>
+    <div class="d-row"><div class="d-label">Coordenadas</div><div class="d-value">${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}</div></div>
+  `;
+  document.getElementById('dp-actions').innerHTML=`
+    <button class="d-btn primary" onclick="openEdit('${c.id}')">✏️ Editar</button>
+    <button class="d-btn ${c.status==='ativa'?'danger':'primary'}" onclick="setStatus('${c.id}','${c.status==='ativa'?'recolha':c.status==='recolha'?'recuperada':'ativa'}')">
+      ${c.status==='ativa'?'📦 Recolher':c.status==='recolha'?'♻️ Recuperar':'🔄 Ativar'}
+    </button>
+    <button class="d-btn danger" onclick="deleteCylinder('${c.id}')">🗑️ Remover</button>
+  `;
+}
+
+// Status and delete functions
+window.setStatus=async function(id,status){
+  const c=cylinders.find(x=>x.id===id);
+  if(c){c.status=status;if(status==='recuperada')c.pres=0;}
+  
+  // Try to sync with server first
+  const synced = await updateCylinderOnServer(id, c);
+  
+  // Always save locally (works even if server fails)
+  saveData();updateStats();renderList();renderDetail();showToast(`${id} → ${STATUS_LABELS[status]}${synced ? ' e sincronizada' : ''}`);
+};
+window.deleteCylinder=async function(id){
+  if(!confirm(`Remover ${id}?`))return;
+  
+  // Try to sync with server first
+  const synced = await deleteCylinderFromServer(id);
+  
+  // Always remove locally (works even if server fails)
+  cylinders=cylinders.filter(c=>c.id!==id);selectedId=null;
+  saveData();updateStats();renderList();renderDetail();updateMapMarkers();showToast(`${id} removida${synced ? ' e sincronizada' : ''}`);
+};
+
+// Select
+window.select=function(id){
+  selectedId=selectedId===id?null:id;
+  renderList();renderDetail();
+  if(!selectedId||!map)return;
+  const c=cylinders.find(x=>x.id===selectedId);
+  if(!c)return;
+  map.flyTo([c.lat,c.lng],Math.max(map.getZoom(),18),{duration:0.6});
+  const marker=bottleMarkers.get(c.id);
+  if(marker)marker.openPopup();
+}
+
+// Custom gas type
+function toggleCustom(p){
+  const sel=document.getElementById(p+'-type');
+  document.getElementById(p+'-cg').style.display=sel.value==='__custom__'?'block':'none';
+}
+function getType(p){
+  const v=document.getElementById(p+'-type').value;
+  if(v==='__custom__'){const t=document.getElementById(p+'-ct').value.trim();return t||'Personalizado';}
+  return v;
+}
+function setType(p,val){
+  const sel=document.getElementById(p+'-type');
+  const custom=document.getElementById(p+'-cg');
+  const input=document.getElementById(p+'-ct');
+  if(BASE_TYPES.includes(val)){
+    sel.value=val;
+    custom.style.display='none';
+  }else{
+    sel.value='__custom__';
+    custom.style.display='block';
+    input.value=val;
+  }
+}
+function fillSelects(p){
+  const sel=document.getElementById(p+'-type');
+  sel.innerHTML='<option value="">Selecione...</option>'+BASE_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')+'<option value="__custom__">➕ Personalizado...</option>';
+  const zsel=document.getElementById(p+'-zone');
+  zsel.innerHTML=DEFAULT_ZONES.map(z=>`<option value="${z.id}">${z.name}</option>`).join('');
+  const wsel=document.getElementById(p+'-worker');
+  wsel.innerHTML=workers.map(w=>`<option value="${w}">${w}</option>`).join('');
+}
+
+// Add modal
+function openAddModal(lat,lng){
+  pendingLat=lat;pendingLng=lng;
+  fillSelects('am');
+  document.getElementById('am-id').value='GAS-'+String(cylinders.length+1).padStart(3,'0');
+  document.getElementById('am-zone').value=DEFAULT_ZONES.find(z=>Math.abs(z.lat-lat)<0.002&&Math.abs(z.lng-lng)<0.002)?.id||'';
+  document.getElementById('am-worker').value=workers[0]||'';
+  document.getElementById('am-status').value='ativa';
+  document.getElementById('am-pres').value='200';
+  document.getElementById('am-ts').value=new Date().toISOString().slice(0,10);
+  document.getElementById('add-overlay').classList.add('open');
+}
+function cancelAdd(){
+  document.getElementById('add-overlay').classList.remove('open');
+  pendingLat=null;pendingLng=null;addingMode=false;
+  document.getElementById('btn-add-lost').classList.remove('active');
+  const fab=document.getElementById('fab-add-btn');
+  if(fab){
+    fab.classList.remove('active');
+    fab.textContent='➕';
+  }
+}
+window.confirmAdd=async function(){
+  const id=document.getElementById('am-id').value.trim();
+  if(!id){alert('Introduz um ID.');return;}
+  if(cylinders.find(c=>c.id===id)){alert(`ID "${id}" já existe.`);return;}
+  const type=getType('am');
+  const zoneId=document.getElementById('am-zone').value;
+  const zone=DEFAULT_ZONES.find(z=>z.id===zoneId);
+  const newCylinder={id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0};
+  
+  // Try to sync with server first
+  const synced = await saveCylinderToServer(newCylinder);
+  
+  // Always add locally (works even if server fails)
+  cylinders.push(newCylinder);
+  saveData();updateStats();renderList();updateMapMarkers();
+  cancelAdd();showToast(`✅ ${id} adicionada${synced ? ' e sincronizada' : ''}`);
+};
+
+// Edit modal
+function openEdit(id){
+  editingId=id;
+  const c=cylinders.find(x=>x.id===id);if(!c)return;
+  fillSelects('em');
+  document.getElementById('em-id').value=c.id;
+  setType('em',c.type);
+  document.getElementById('em-zone').value=c.zoneId;
+  document.getElementById('em-worker').value=c.worker;
+  document.getElementById('em-status').value=c.status;
+  document.getElementById('em-pres').value=c.pres;
+  document.getElementById('em-ts').value=displayToIso(c.ts);
+  document.getElementById('edit-title').textContent=`✏️ Editar — ${c.id}`;
+  document.getElementById('edit-overlay').classList.add('open');
+}
+function closeEdit(){document.getElementById('edit-overlay').classList.remove('open');editingId=null;}
+window.saveEdit=async function(){
+  const c=cylinders.find(x=>x.id===editingId);if(!c)return;
+  c.type=getType('em');
+  c.zoneId=document.getElementById('em-zone').value;
+  c.worker=document.getElementById('em-worker').value;
+  c.status=document.getElementById('em-status').value;
+  c.pres=parseInt(document.getElementById('em-pres').value)||0;
+  const tsIso=document.getElementById('em-ts').value;
+  if(tsIso)c.ts=isoToDisplay(tsIso);
+  
+  // Try to sync with server first
+  const synced = await updateCylinderOnServer(editingId, c);
+  
+  // Always save locally (works even if server fails)
+  saveData();updateStats();renderList();renderDetail();updateMapMarkers();
+  closeEdit();showToast(`✅ ${c.id} atualizada${synced ? ' e sincronizada' : ''}`);
+};
+
+// Config modal
+function openModal(){
+  document.getElementById('cg-name').value='';
+  renderWorkersList();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function renderWorkersList(){
+  const wlist=document.getElementById('workers-list');
+  wlist.innerHTML=workers.map((w,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <input type="text" value="${w}" id="worker-${i}" style="flex:1;padding:4px;border:1px solid var(--color-border);border-radius:4px"/>
+      <button onclick="removeWorker(${i})" style="padding:4px 8px;border:none;background:#dc3545;color:white;border-radius:4px;cursor:pointer">🗑️</button>
+    </div>
+  `).join('');
+}
+window.removeWorker=function(i){workers.splice(i,1);renderWorkersList();}
+window.saveConfig=function(){
+  const cg=document.getElementById('cg-name').value.trim();
+  if(cg&&!BASE_TYPES.includes(cg))BASE_TYPES.push(cg);
+  for(let i=0;i<workers.length;i++){
+    const val=document.getElementById(`worker-${i}`).value.trim();
+    if(val)workers[i]=val;
+  }
+  workers=workers.filter(w=>w);
+  saveData();
+  closeModal();
+  showToast('✅ Configurações salvas');
+};
+
+// Map
+function initMap(){
+  map=L.map('map',{zoomControl:true,attributionControl:true,minZoom:14,maxZoom:19}).setView([38.4777,-8.7934],17);
+  satelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+    maxZoom:19,maxNativeZoom:19,noWrap:true,attribution:'Tiles &copy; Esri'
+  });
+  offlineOverlay=L.imageOverlay('lisnave_sat_offline.png',LISNAVE_BOUNDS,{opacity:1,interactive:false});
+  const applyBaseLayer=(isOnline)=>{
+    const useOffline=!isOnline;
+    if(map.hasLayer(satelliteLayer))map.removeLayer(satelliteLayer);
+    if(map.hasLayer(offlineOverlay))map.removeLayer(offlineOverlay);
+    if(useOffline){
+      map.setMinZoom(14);map.setMaxZoom(22);offlineOverlay.addTo(map);
+      if(!usingOfflineBase)showToast('📴 Modo offline: imagem satélite estática');
+    }else{
+      map.setMinZoom(14);map.setMaxZoom(19);satelliteLayer.addTo(map);
+      if(usingOfflineBase)showToast('🌐 Modo online: satélite em tempo real');
+    }
+    usingOfflineBase=useOffline;
+  };
+  applyBaseLayer(navigator.onLine);
+  window.addEventListener('online',()=>applyBaseLayer(true));
+  window.addEventListener('offline',()=>applyBaseLayer(false));
+  
+  if(navigator.geolocation){
+    navigator.geolocation.watchPosition(pos=>{
+      const loc=[pos.coords.latitude,pos.coords.longitude];
+      if(userMarker){
+        userMarker.setLatLng(loc);
+        if(userMarker._accCircle){
+          userMarker._accCircle.setLatLng(loc);
+          userMarker._accCircle.setRadius(pos.coords.accuracy||20);
+        }
+      } else {
+        userMarker=L.circleMarker(loc,{radius:9,color:'#ffffff',weight:3,fillColor:'#4285F4',fillOpacity:1,interactive:false}).addTo(map);
+        userMarker._accCircle=L.circle(loc,{radius:pos.coords.accuracy||20,color:'#4285F4',weight:1,fillColor:'#4285F4',fillOpacity:0.1,interactive:false}).addTo(map);
+        map.setView(loc,18);
+        showToast('📍 Localização GPS ativa',2500);
+      }
+    },err=>{
+      if(err.code===1)showToast('⚠️ Permissão GPS negada. Ativa nas definições do browser.',5000);
+      else if(err.code===2)showToast('⚠️ GPS indisponível neste local',3000);
+      else if(err.code===3)showToast('⚠️ Timeout GPS. Tentando novamente...',3000);
+      else showToast('⚠️ Erro desconhecido no GPS',3000);
+    },{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+  } else {
+    showToast('⚠️ GPS não disponível neste dispositivo',3000);
+  }
+  
+  map.on('click',e=>{
+    if(!addingMode)return;
+    openAddModal(e.latlng.lat,e.latlng.lng);
+  });
+  
+  updateMapMarkers();
+}
+
+function updateMapMarkers(){
+  bottleMarkers.forEach(m=>map.removeLayer(m));
+  bottleMarkers.clear();
+  cylinders.filter(c=>(filterStatus==='all'||c.status===filterStatus)&&(!filterZone||c.zoneId===filterZone)&&(!searchText||c.id.toLowerCase().includes(searchText.toLowerCase())||c.type.toLowerCase().includes(searchText.toLowerCase())||c.worker.toLowerCase().includes(searchText.toLowerCase()))).forEach(c=>{
+    const zone=DEFAULT_ZONES.find(z=>z.id===c.zoneId);
+    const marker=L.circleMarker([c.lat,c.lng],{
+      radius:8,color:'#ffffff',weight:2,fillColor:STATUS_COLORS[c.status],fillOpacity:0.8,interactive:true
+    }).addTo(map);
+    marker.bindPopup(`
+      <div style="min-width:200px">
+        <strong>${c.id}</strong><br>
+        🧪 ${c.type}<br>
+        📍 ${zone?.name||c.zoneId}<br>
+        👷 ${c.worker}<br>
+        ⚡ ${c.pres} bar<br>
+        📅 ${c.ts}<br>
+        <div style="margin-top:8px">
+          <button onclick="select('${c.id}')" style="margin-right:4px;padding:2px 6px;border:none;background:#007bff;color:white;border-radius:3px;cursor:pointer;font-size:11px">Ver</button>
+          <button onclick="setStatus('${c.id}','${c.status==='ativa'?'recolha':c.status==='recolha'?'recuperada':'ativa'}')" style="margin-right:4px;padding:2px 6px;border:none;background:${c.status==='ativa'?'#dc3545':'#28a745'};color:white;border-radius:3px;cursor:pointer;font-size:11px">${c.status==='ativa'?'Recolher':c.status==='recolha'?'Recuperar':'Ativar'}</button>
+        </div>
+      </div>
+    `);
+    bottleMarkers.set(c.id,marker);
+  });
+}
+
+function toggleAddMode(){
+  addingMode=!addingMode;
+  const btn=document.getElementById('btn-add-lost');
+  const fab=document.getElementById('fab-add-btn');
+  if(addingMode){
+    btn.classList.add('active');fab.classList.add('active');fab.textContent='❌';
+    showToast('📍 Clique no mapa para adicionar garrafa');
+    map.getContainer().style.cursor='crosshair';
+  }else{
+    btn.classList.remove('active');fab.classList.remove('active');fab.textContent='➕';
+    map.getContainer().style.cursor='';
+  }
+}
+
+function locateUser(){
+  if(!userMarker){showToast('⚠️ GPS não disponível');return;}
+  map.flyTo(userMarker.getLatLng(),Math.max(map.getZoom(),18),{duration:0.6});
+  showToast('📍 Centrado na sua localização');
+}
+
+function toggleMobileList(){
+  mobileListOpen=!mobileListOpen;
+  const sb=document.getElementById('sb');
+  const btn=document.getElementById('btn-toggle-list');
+  const fab=document.getElementById('fab-list-btn');
+  if(mobileListOpen){
+    sb.classList.remove('open');btn.textContent='📋 Esconder Lista';fab.textContent='📋';
+  }else{
+    sb.classList.add('open');btn.textContent='📋 Mostrar Lista';fab.textContent='📋';
+  }
+}
+
+function updateUI(){
+  updateStats();renderList();renderDetail();updateMapMarkers();
+}
+
+// Initialize
+document.getElementById('sin').addEventListener('input',e=>{searchText=e.target.value;renderList();updateMapMarkers();});
+document.querySelectorAll('.fch').forEach(btn=>btn.addEventListener('click',()=>filterBy(btn.dataset.f)));
+document.getElementById('zsel').addEventListener('change',e=>{filterZone=e.target.value;renderList();updateMapMarkers();});
+document.getElementById('dpclose').addEventListener('click',()=>{selectedId=null;renderList();renderDetail();updateMapMarkers();});
+document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
+document.getElementById('add-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('add-overlay'))cancelAdd();});
+document.getElementById('edit-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('edit-overlay'))closeEdit();});
+
+// Initialize WebSocket for real-time sync
+initializeWebSocket();
+
+// Initialize zones select
+DEFAULT_ZONES.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.name;zsel.appendChild(o);});
+
+// Load data and initialize map
+const data=safeLoadData();
+cylinders=data.cylinders;
+workers=data.workers;
+initMap();
+updateUI();
+
+// Mobile responsiveness
+if(window.innerWidth<=900){
+  document.getElementById('sb').classList.add('open');
+  mobileListOpen=true;
+}
+window.addEventListener('resize',()=>{
+  if(window.innerWidth>900){
+    document.getElementById('sb').classList.remove('open');
+    document.getElementById('dp').classList.remove('open');
+    mobileListOpen=false;
+  }
+  if(map)setTimeout(()=>map.invalidateSize(),100);
+});
+
+// Register service worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
