@@ -574,7 +574,7 @@ function initializeWebSocket() {
   if (!syncEnabled) return;
   
   try {
-    socket = io('http://localhost:3000');
+    socket = io('http://localhost:8080');
     
     socket.on('connect', () => {
       console.log('🔄 Conectado ao servidor de sincronização');
