@@ -807,45 +807,113 @@ async function deleteCylinderFromServer(id) {
   }
 }
 
-// Função segura para carregar dados com validação
-async function safeLoadData() {
+// WebSocket para sincronização
+let ws = null;
+let reconnectInterval = null;
+
+function connectWebSocket() {
   try {
-    // Carregar dados do GitHub API
-    const cylinders = await fetchCylinders();
+    // Determinar URL do servidor
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const wsUrl = isLocal ? 
+      `ws://localhost:8080` : 
+      `wss://SEU_NGROK_URL_AQUI`; // Substituir com URL do ngrok
     
-    if (cylinders.length === 0) {
-      console.log('Nenhum cilindro encontrado no GitHub, usando padrões');
-      return {
-        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
-        workers: [...DEFAULT_WORKERS]
-      };
-    }
+    console.log('🔗 Conectando ao servidor:', wsUrl);
+    ws = new WebSocket(wsUrl);
     
-    // Validar cada cilindro
-    const validCylinders = cylinders.filter(c => 
-      c && c.id && c.lat && c.lng && c.status && 
-      typeof c.lat === 'number' && typeof c.lng === 'number'
-    );
+    ws.onopen = function() {
+      console.log('✅ Conectado ao servidor WebSocket');
+      clearInterval(reconnectInterval);
+      
+      // Limpar tentativas de reconexão
+      if (reconnectInterval) {
+        clearInterval(reconnectInterval);
+        reconnectInterval = null;
+      }
+    };
     
-    if (validCylinders.length === 0) {
-      console.warn('Nenhum cilindro válido encontrado, usando padrões');
-      return {
-        cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
-        workers: [...DEFAULT_WORKERS]
-      };
-    }
+    ws.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📨 Mensagem recebida:', data);
+        
+        if (data.type === 'initial_data') {
+          cylinders = data.data.cylinders || [];
+          workers = data.data.workers || [];
+          console.log('📥 Dados iniciais recebidos:', { cylinders, workers });
+          updateStats();
+          renderList();
+          updateMapMarkers();
+        } else if (data.type === 'cylinders_updated') {
+          cylinders = data.cylinders || [];
+          console.log('🔄 Cilindros atualizados:', cylinders);
+          updateStats();
+          renderList();
+          updateMapMarkers();
+        }
+      } catch (error) {
+        console.error('❌ Erro ao processar mensagem:', error);
+      }
+    };
     
-    return {
-      cylinders: validCylinders,
-      workers: [...DEFAULT_WORKERS]
+    ws.onclose = function() {
+      console.log('🔌 Desconectado do servidor WebSocket');
+      
+      // Tentar reconectar após 3 segundos
+      if (!reconnectInterval) {
+        reconnectInterval = setInterval(connectWebSocket, 3000);
+      }
+    };
+    
+    ws.onerror = function(error) {
+      console.error('❌ Erro no WebSocket:', error);
     };
     
   } catch (error) {
-    console.error('Erro ao carregar dados do GitHub:', error);
+    console.error('❌ Erro ao conectar WebSocket:', error);
+  }
+}
+
+// Função segura para carregar dados com validação
+function safeLoadData() {
+  try {
+    // Carregar dados do localStorage primeiro (fallback)
+    const saved = localStorage.getItem('lisnave_data');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        console.log('✅ Dados carregados do localStorage (fallback):', data);
+        return data;
+      } catch (e) {
+        console.error('Erro ao fazer parse dos dados locais:', e);
+      }
+    }
+    
+    // Se não houver dados no localStorage, retornar vazios
+    console.log('📂 Nenhum dado encontrado no localStorage, iniciando vazio');
     return {
-      cylinders: JSON.parse(JSON.stringify(DEFAULT_CYLINDERS)),
-      workers: [...DEFAULT_WORKERS]
+      cylinders: [],
+      workers: []
     };
+  } catch (error) {
+    console.error('Erro ao carregar dados:', error);
+    return {
+      cylinders: [],
+      workers: []
+    };
+  }
+}
+
+// Enviar dados para o servidor
+function sendToServer(type, data) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type, ...data }));
+    console.log('📤 Dados enviados:', { type, ...data });
+  } else {
+    console.warn('⚠️ WebSocket não conectado, salvando localmente');
+    // Fallback para localStorage
+    saveData();
   }
 }
 
@@ -853,17 +921,20 @@ async function safeLoadData() {
 let cylinders = [];
 let workers = [...DEFAULT_WORKERS];
 
-// Carregar dados do GitHub quando a página carregar
-async function initializeApp() {
-  const data = await safeLoadData();
+// Carregar dados do localStorage quando a página carregar
+function initializeApp() {
+  const data = safeLoadData();
   cylinders = data.cylinders;
   workers = data.workers;
+  
+  // Conectar ao servidor WebSocket
+  connectWebSocket();
   
   // Inicializar mapa após carregar dados
   initMap();
   updateStats();
   renderList();
-  renderDetail();
+  updateMapMarkers();
 }
 
 // Chamar inicialização quando o DOM estiver pronto
@@ -1145,6 +1216,11 @@ window.confirmAdd=function(){
   const zoneId=document.getElementById('am-zone').value;
   const zone=DEFAULT_ZONES.find(z=>z.id===zoneId);
   const newCylinder={id,type,zoneId,lat:pendingLat,lng:pendingLng,status:document.getElementById('am-status').value,ts:isoToDisplay(document.getElementById('am-ts').value)||now(),worker:document.getElementById('am-worker').value,pres:parseInt(document.getElementById('am-pres').value)||0};
+  
+  // Enviar para o servidor WebSocket
+  sendToServer('add_cylinder', { cylinder: newCylinder });
+  
+  // Adicionar localmente imediatamente (otimista UI)
   cylinders.push(newCylinder);
   saveData();
   updateStats();renderList();updateMapMarkers();
